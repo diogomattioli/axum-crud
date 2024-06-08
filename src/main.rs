@@ -1,11 +1,8 @@
 mod crud;
+mod types;
 
 use axum::{ routing::{ delete, get, post, put }, Router };
-
-#[derive(Debug, serde::Deserialize)]
-pub struct Dummy {
-    pub name: String,
-}
+use types::Dummy;
 
 #[tokio::main]
 async fn main() {
