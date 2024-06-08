@@ -1,30 +1,49 @@
+use sqlx::{ any::{ AnyQueryResult, AnyRow }, Executor };
+
 use crate::crud;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Dummy {
+    pub id_dummy: i64,
     pub name: String,
 }
 
 impl crud::Creator for Dummy {
-    fn sql_insert(&self) -> &str {
-        "INSERT INTO dummy VALUES (?)"
+    async fn create_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        sqlx
+            ::query("INSERT INTO dummy VALUES ($1, $2)")
+            .bind(self.id_dummy)
+            .bind(&self.name)
+            .execute(executor).await
     }
 }
 
 impl crud::Retriever for Dummy {
-    fn sql_retrieve(&self) -> &str {
-        "SELECT * FROM dummy WHERE id_dummy = ?"
+    async fn retrieve_query<'e, E>(executor: E, id: i64) -> Result<AnyRow, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        sqlx::query("SELECT * FROM dummy WHERE id_dummy = $1").bind(id).fetch_one(executor).await
     }
 }
 
 impl crud::Updater for Dummy {
-    fn sql_update(&self) -> &str {
-        "UPDATE dummy SET name = ? WHERE id_dummy = ?"
+    async fn update_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        sqlx
+            ::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
+            .bind(self.id_dummy)
+            .bind(&self.name)
+            .execute(executor).await
     }
 }
 
 impl crud::Deleter for Dummy {
-    fn sql_delete(&self) -> &str {
-        "DELETE FROM dummy WHERE id_dummy = ?"
+    async fn delete_query<'e, E>(executor: E, id: i64) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        sqlx::query("DELETE FROM dummy WHERE id_dummy = $1").bind(id).execute(executor).await
     }
 }

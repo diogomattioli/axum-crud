@@ -1,30 +1,47 @@
 use axum::{ extract::Path, http::StatusCode, response::IntoResponse, Json };
+use sqlx::{ any::{ AnyQueryResult, AnyRow }, Executor };
 
 use std::fmt::Debug;
 
 pub trait Creator {
-    fn validate_create(&self) -> Result<(), String> {
+    async fn create_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        let _ = executor;
         Ok(())
     }
-    fn sql_insert(&self) -> &str;
+
+    async fn create_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>;
 }
 
 pub trait Retriever {
-    fn sql_retrieve(&self) -> &str;
+    async fn retrieve_query<'e, E>(executor: E, id: i64) -> Result<AnyRow, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>;
 }
 
 pub trait Updater {
-    fn validate_update(&self) -> Result<(), String> {
+    async fn update_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        let _ = executor;
         Ok(())
     }
-    fn sql_update(&self) -> &str;
+
+    async fn update_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>;
 }
 
 pub trait Deleter {
-    fn validate_delete(&self) -> Result<(), String> {
+    async fn delete_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
+        where E: Executor<'e, Database = sqlx::Any>
+    {
+        let _ = executor;
         Ok(())
     }
-    fn sql_delete(&self) -> &str;
+
+    async fn delete_query<'e, E>(executor: E, id: i64) -> Result<AnyQueryResult, sqlx::Error>
+        where E: Executor<'e, Database = sqlx::Any>;
 }
 
 pub async fn create<T: Creator + Debug>(Json(payload): Json<T>) -> StatusCode {
