@@ -17,11 +17,10 @@ pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    if let Err(_) = pool.execute(T::create_query(&new)).await {
-        return StatusCode::NOT_ACCEPTABLE;
+    match pool.execute(T::create_query(&new)).await {
+        Ok(_) => StatusCode::CREATED,
+        Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
-
-    StatusCode::CREATED
 }
 
 pub async fn retrieve<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
@@ -56,11 +55,10 @@ pub async fn update<'a, T>(
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    if let Err(_) = pool.execute(T::update_query(&new)).await {
-        return StatusCode::NOT_ACCEPTABLE;
+    match pool.execute(T::update_query(&new)).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
-
-    StatusCode::OK
 }
 
 pub async fn delete<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
@@ -76,11 +74,10 @@ pub async fn delete<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    if let Err(_) = pool.execute(T::delete_query(id)).await {
-        return StatusCode::NOT_ACCEPTABLE;
+    match pool.execute(T::delete_query(id)).await {
+        Ok(_) => StatusCode::NO_CONTENT,
+        Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
-
-    StatusCode::NO_CONTENT
 }
 
 #[cfg(test)]
