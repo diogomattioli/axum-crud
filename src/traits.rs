@@ -1,7 +1,7 @@
 use sqlx::any::AnyArguments;
 
 pub trait Creator {
-    fn create_is_valid(&self) -> Result<(), String> {
+    fn create_is_valid(&mut self) -> Result<(), String> {
         Ok(())
     }
 
@@ -13,7 +13,7 @@ pub trait Retriever {
 }
 
 pub trait Updater<T> {
-    fn update_is_valid(&self, old: T) -> Result<(), String> {
+    fn update_is_valid(&mut self, old: T) -> Result<(), String> {
         let _ = old;
         Ok(())
     }

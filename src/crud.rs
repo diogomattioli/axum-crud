@@ -10,7 +10,7 @@ use sqlx::{ any::AnyRow, Any, Executor, Pool };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
-pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(new): Json<T>) -> StatusCode
+pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
     where T: Creator
 {
     if let Err(_) = new.create_is_valid() {
@@ -40,7 +40,7 @@ pub async fn retrieve<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>)
 pub async fn update<'a, T>(
     State(pool): State<Pool<Any>>,
     Path(id): Path<i64>,
-    Json(new): Json<T>
+    Json(mut new): Json<T>
 ) -> StatusCode
     where T: From<AnyRow> + Retriever + Updater<T>
 {
