@@ -122,10 +122,13 @@ name = "axum_crud"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "http-body-util",
+ "mime",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
+ "tower",
 ]
 
 [[package]]
