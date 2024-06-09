@@ -27,13 +27,15 @@ pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>
 pub async fn retrieve<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
     where T: From<AnyRow> + Retriever + Serialize
 {
-    match pool.fetch_one(T::retrieve_query(id)).await {
-        Ok(row) =>
-            (
-                StatusCode::OK,
-                Json(serde_json::to_value(<AnyRow as Into<T>>::into(row)).unwrap()),
-            ).into_response(),
-        Err(_) => { StatusCode::NOT_FOUND.into_response() }
+    let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    let old: T = row.into();
+
+    match serde_json::to_value(old) {
+        Ok(value) => (StatusCode::OK, Json(value)).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
 
