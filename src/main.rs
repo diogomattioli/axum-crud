@@ -4,7 +4,7 @@ mod types;
 
 use axum::{ routing::{ delete, get, post, put }, Router };
 use sqlx::any::AnyPoolOptions;
-use types::Dummy;
+use types::dummy::Dummy;
 
 #[tokio::main]
 async fn main() {
