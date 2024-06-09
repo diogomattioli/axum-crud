@@ -1,47 +1,34 @@
-use axum::{ extract::Path, http::StatusCode, response::IntoResponse, Json };
-use sqlx::{ any::{ AnyQueryResult, AnyRow }, Executor };
+use axum::{ extract::{ Path, State }, http::StatusCode, response::IntoResponse, Json };
+use sqlx::{ any::AnyArguments, Any, Executor, Pool };
 
 use std::fmt::Debug;
 
 pub trait Creator {
-    async fn create_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        let _ = executor;
+    fn create_is_valid(&self) -> Result<(), String> {
         Ok(())
     }
 
-    async fn create_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>;
+    fn create_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
 }
 
 pub trait Retriever {
-    async fn retrieve_query<'e, E>(executor: E, id: i64) -> Result<AnyRow, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>;
+    fn retrieve_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
 }
 
 pub trait Updater {
-    async fn update_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        let _ = executor;
+    fn update_is_valid(&self) -> Result<(), String> {
         Ok(())
     }
 
-    async fn update_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>;
+    fn update_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
 }
 
 pub trait Deleter {
-    async fn delete_is_valid<'e, E>(&self, executor: E) -> Result<(), String>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        let _ = executor;
+    fn delete_is_valid(&self) -> Result<(), String> {
         Ok(())
     }
 
-    async fn delete_query<'e, E>(executor: E, id: i64) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>;
+    fn delete_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
 }
 
 pub async fn create<T: Creator + Debug>(Json(payload): Json<T>) -> StatusCode {

@@ -1,4 +1,4 @@
-use sqlx::{ any::{ AnyQueryResult, AnyRow }, Executor };
+use sqlx::any::AnyArguments;
 
 use crate::crud;
 
@@ -9,41 +9,27 @@ pub struct Dummy {
 }
 
 impl crud::Creator for Dummy {
-    async fn create_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        sqlx
-            ::query("INSERT INTO dummy VALUES ($1, $2)")
-            .bind(self.id_dummy)
-            .bind(&self.name)
-            .execute(executor).await
+    fn create_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>> {
+        sqlx::query("INSERT INTO dummy VALUES ($1, $2)").bind(self.id_dummy).bind(self.name.clone())
     }
 }
 
 impl crud::Retriever for Dummy {
-    async fn retrieve_query<'e, E>(executor: E, id: i64) -> Result<AnyRow, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        sqlx::query("SELECT * FROM dummy WHERE id_dummy = $1").bind(id).fetch_one(executor).await
+    fn retrieve_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>> {
+        sqlx::query("SELECT * FROM dummy WHERE id_dummy = $1").bind(id)
     }
 }
 
 impl crud::Updater for Dummy {
-    async fn update_query<'e, E>(&self, executor: E) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        sqlx
-            ::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
+    fn update_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>> {
+        sqlx::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
             .bind(self.id_dummy)
-            .bind(&self.name)
-            .execute(executor).await
+            .bind(self.name.clone())
     }
 }
 
 impl crud::Deleter for Dummy {
-    async fn delete_query<'e, E>(executor: E, id: i64) -> Result<AnyQueryResult, sqlx::Error>
-        where E: Executor<'e, Database = sqlx::Any>
-    {
-        sqlx::query("DELETE FROM dummy WHERE id_dummy = $1").bind(id).execute(executor).await
+    fn delete_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>> {
+        sqlx::query("DELETE FROM dummy WHERE id_dummy = $1").bind(id)
     }
 }
