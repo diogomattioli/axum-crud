@@ -10,7 +10,7 @@ use sqlx::{ any::AnyRow, Any, Executor, Pool };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
-pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
+pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
     where T: Creator
 {
     if let Err(_) = new.create_is_valid() {
@@ -23,7 +23,7 @@ pub async fn create<'a, T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>
     }
 }
 
-pub async fn retrieve<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
+pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
     where T: From<AnyRow> + Retriever + Serialize
 {
     let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
@@ -38,7 +38,7 @@ pub async fn retrieve<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>)
     }
 }
 
-pub async fn update<'a, T>(
+pub async fn update<T>(
     State(pool): State<Pool<Any>>,
     Path(id): Path<i64>,
     Json(mut new): Json<T>
@@ -61,7 +61,7 @@ pub async fn update<'a, T>(
     }
 }
 
-pub async fn delete<'a, T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
+pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
     where T: From<AnyRow> + Retriever + Deleter
 {
     let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
