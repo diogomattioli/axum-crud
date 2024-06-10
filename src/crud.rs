@@ -80,6 +80,71 @@ pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> St
     }
 }
 
+pub async fn sub_create<T, T2>(
+    uri: Uri,
+    State(pool): State<Pool<Any>>,
+    Path(id): Path<i64>,
+    Json(new): Json<T2>
+)
+    -> Response
+    where T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>, T2: Creator
+{
+    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    create::<T2>(uri, State(pool), Json(new)).await
+}
+
+pub async fn sub_retrieve<T, T2>(
+    State(pool): State<Pool<Any>>,
+    Path((id, sub_id)): Path<(i64, i64)>
+)
+    -> Response
+    where
+        T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
+        T2: Retriever<T2> + Serialize + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+{
+    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    retrieve::<T2>(State(pool), Path(sub_id)).await
+}
+
+pub async fn sub_update<T, T2>(
+    State(pool): State<Pool<Any>>,
+    Path((id, sub_id)): Path<(i64, i64)>,
+    Json(new): Json<T2>
+)
+    -> StatusCode
+    where
+        T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
+        T2: Retriever<T2> + Updater<T2> + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+{
+    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+        return StatusCode::NOT_FOUND;
+    }
+
+    update::<T2>(State(pool), Path(sub_id), Json(new)).await
+}
+
+pub async fn sub_delete<T, T2>(
+    State(pool): State<Pool<Any>>,
+    Path((id, sub_id)): Path<(i64, i64)>
+)
+    -> StatusCode
+    where
+        T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
+        T2: Retriever<T2> + Deleter + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+{
+    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+        return StatusCode::NOT_FOUND;
+    }
+
+    delete::<T2>(State(pool), Path(sub_id)).await
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{ http::{ self, Request, StatusCode }, routing::{ delete, get, post, put }, Router };
@@ -88,7 +153,11 @@ mod tests {
     use serde_json::json;
     use tower::ServiceExt;
     use sqlx::{ any::AnyPoolOptions, Any, Executor, Pool };
-    use crate::{ crud, traits::{ Creator, Retriever }, types::dummy::Dummy };
+    use crate::{
+        crud,
+        traits::{ Creator, Retriever },
+        types::{ dummy::Dummy, sub_dummy::SubDummy },
+    };
 
     async fn setup_db(size: i64) -> Pool<Any> {
         sqlx::any::install_default_drivers();
@@ -101,10 +170,26 @@ mod tests {
             sqlx::raw_sql("CREATE TABLE dummy (id_dummy bigint, name text);")
         ).await;
 
+        let _ = pool.execute(
+            sqlx::raw_sql(
+                "CREATE TABLE sub_dummy (id_sub_dummy bigint, name text, id_dummy bigint);"
+            )
+        ).await;
+
         for i in 1..=size {
             let _ = pool.execute(
                 Dummy::prepare_create(
                     &(Dummy { id_dummy: i, name: format!("name-{}", i), is_valid: Some(true) })
+                )
+            ).await;
+            let _ = pool.execute(
+                SubDummy::prepare_create(
+                    &(SubDummy {
+                        id_sub_dummy: i,
+                        id_dummy: i,
+                        name: format!("name-{}", i),
+                        is_valid: Some(true),
+                    })
                 )
             ).await;
         }
@@ -118,6 +203,11 @@ mod tests {
             .route("/dummy/:id", get(crud::retrieve::<Dummy>))
             .route("/dummy/:id", put(crud::update::<Dummy>))
             .route("/dummy/:id", delete(crud::delete::<Dummy>))
+
+            .route("/dummy/:id/subdummy/", post(crud::sub_create::<Dummy, SubDummy>))
+            .route("/dummy/:id/subdummy/:id", get(crud::sub_retrieve::<Dummy, SubDummy>))
+            .route("/dummy/:id/subdummy/:id", put(crud::sub_update::<Dummy, SubDummy>))
+            .route("/dummy/:id/subdummy/:id", delete(crud::sub_delete::<Dummy, SubDummy>))
             .with_state(pool)
     }
 
@@ -311,6 +401,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_sub_ok() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name", "id_sub_dummy": 2}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/1/subdummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(2).fetch_one(&pool).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(dummy.id_dummy, 1);
+        assert_eq!(dummy.name, "name");
+        assert_eq!(dummy.id_sub_dummy, 2);
+    }
+
+    #[tokio::test]
+    async fn create_sub_not_found() {
+        let pool = setup_db(0).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name", "id_sub_dummy": 2}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/1/subdummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(SubDummy::prepare_retrieve(2).fetch_one(&pool).await.is_err());
+    }
+
+    #[tokio::test]
     async fn retrieve_ok() {
         let pool = setup_db(1).await;
 
@@ -339,7 +479,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retrieve_not_found() {
+    async fn retrieve_inexsistent() {
         let pool = setup_db(0).await;
 
         let app = app(pool.clone()).await;
@@ -380,6 +520,78 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn retrieve_sub_ok() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/1/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let dummy: Dummy = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(dummy.id_dummy, 1);
+        assert_eq!(dummy.name, "name-1");
+    }
+
+    #[tokio::test]
+    async fn retrieve_sub_not_found() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn retrieve_sub_mismatch() {
+        let pool = setup_db(2).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -558,6 +770,87 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn update_sub_ok() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/dummy/1/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(dummy.id_sub_dummy, 1);
+        assert_eq!(dummy.id_dummy, 1);
+        assert_eq!(dummy.name, "name-new");
+    }
+
+    #[tokio::test]
+    async fn update_sub_not_found() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(dummy.id_sub_dummy, 1);
+        assert_eq!(dummy.id_dummy, 1);
+        assert_eq!(dummy.name, "name-1");
+    }
+
+    #[tokio::test]
+    async fn update_sub_mismatch() {
+        let pool = setup_db(2).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(dummy.id_sub_dummy, 1);
+        assert_eq!(dummy.id_dummy, 1);
+        assert_eq!(dummy.name, "name-1");
+    }
+
+    #[tokio::test]
     async fn delete_ok() {
         let pool = setup_db(1).await;
 
@@ -649,5 +942,80 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
+    }
+
+    #[tokio::test]
+    async fn delete_sub_ok() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/dummy/1/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await;
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert!(dummy.is_err());
+    }
+
+    #[tokio::test]
+    async fn delete_sub_not_found() {
+        let pool = setup_db(1).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await;
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(dummy.is_ok());
+    }
+
+    #[tokio::test]
+    async fn delete_sub_mismatch() {
+        let pool = setup_db(2).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::DELETE)
+                    .uri("/dummy/2/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        let dummy = SubDummy::prepare_retrieve(1).fetch_one(&pool).await;
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert!(dummy.is_ok());
     }
 }
