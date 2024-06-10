@@ -20,7 +20,9 @@ impl Creator for Dummy {
     }
 
     fn prepare_create<'a>(&self) -> Query<'a, Any, AnyArguments<'a>> {
-        sqlx::query("INSERT INTO dummy VALUES ($1, $2)").bind(self.id_dummy).bind(self.name.clone())
+        sqlx::query("INSERT INTO dummy VALUES ($1, $2) RETURNING id_dummy")
+            .bind(self.id_dummy)
+            .bind(self.name.clone())
     }
 }
 

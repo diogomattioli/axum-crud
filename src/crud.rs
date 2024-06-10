@@ -1,25 +1,35 @@
 use axum::{
     extract::{ Path, State },
-    http::StatusCode,
+    http::{ StatusCode, Uri },
     response::{ IntoResponse, Response },
     Json,
 };
 
 use serde::Serialize;
-use sqlx::{ any::AnyRow, Any, FromRow, Pool };
+use sqlx::{ any::AnyRow, Any, FromRow, Pool, Row };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
-pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
+pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> Response
     where T: Creator
 {
     if T::validate_create(&mut new).is_err() {
-        return StatusCode::UNPROCESSABLE_ENTITY;
+        return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
-    match T::prepare_create(&new).execute(&pool).await {
-        Ok(_) => StatusCode::CREATED,
-        Err(_) => StatusCode::NOT_ACCEPTABLE,
+    match T::prepare_create(&new).fetch_one(&pool).await {
+        Ok(row) => {
+            let id = row.try_get(0).unwrap_or(0i64);
+            (
+                StatusCode::CREATED,
+                [
+                    ("Location", format!("{}{}", uri.path(), id)),
+                    ("X-Item-ID", format!("{}", id)),
+                ],
+                "",
+            ).into_response()
+        }
+        Err(_) => StatusCode::NOT_ACCEPTABLE.into_response(),
     }
 }
 
@@ -135,6 +145,64 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
         assert_eq!(dummy.name, "name");
+    }
+
+    #[tokio::test]
+    async fn create_ok_location() {
+        let pool = setup_db(0).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name"}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(
+            response
+                .headers()
+                .get("Location")
+                .map(|v| v.to_str().unwrap()),
+            Some("/dummy/1")
+        );
+    }
+
+    #[tokio::test]
+    async fn create_ok_x_item_id() {
+        let pool = setup_db(0).await;
+
+        let app = app(pool.clone()).await;
+
+        let body = json!({"id_dummy": 1, "name": "name"}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap()
+            ).await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(
+            response
+                .headers()
+                .get("X-Item-ID")
+                .map(|v| v.to_str().unwrap()),
+            Some("1")
+        );
     }
 
     #[tokio::test]
