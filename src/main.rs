@@ -2,14 +2,20 @@ mod crud;
 mod traits;
 mod types;
 
+use std::env;
+
 use axum::{ routing::{ delete, get, post, put }, Router };
 use sqlx::any::AnyPoolOptions;
 use types::dummy::Dummy;
 
 #[tokio::main]
 async fn main() {
+    let Ok(database_url) = env::var("DATABASE_URL") else {
+        panic!("DATABASE_URL not set");
+    };
+
     sqlx::any::install_default_drivers();
-    let pool = AnyPoolOptions::new().max_connections(5).connect("sqlite:test.db").await.unwrap();
+    let pool = AnyPoolOptions::new().max_connections(5).connect(&database_url).await.unwrap();
 
     let app = Router::new()
         .route("/", get(root))
