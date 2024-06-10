@@ -15,7 +15,9 @@ async fn main() {
     };
 
     sqlx::any::install_default_drivers();
-    let pool = AnyPoolOptions::new().max_connections(5).connect(&database_url).await.unwrap();
+    let Ok(pool) = AnyPoolOptions::new().max_connections(5).connect(&database_url).await else {
+        panic!("Cannot connect to the database");
+    };
 
     let app = Router::new()
         .route("/", get(root))
