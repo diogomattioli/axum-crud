@@ -13,11 +13,11 @@ use crate::traits::{ Creator, Deleter, Retriever, Updater };
 pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
     where T: Creator
 {
-    if let Err(_) = T::create_is_valid(&mut new) {
+    if let Err(_) = T::validate_create(&mut new) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::create_query(&new)).await {
+    match pool.execute(T::prepare_create(&new)).await {
         Ok(_) => StatusCode::CREATED,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -26,7 +26,7 @@ pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) ->
 pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
     where T: From<AnyRow> + Retriever + Serialize
 {
-    let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
+    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
 
@@ -42,17 +42,17 @@ pub async fn update<T>(
 ) -> StatusCode
     where T: From<AnyRow> + Retriever + Updater<T>
 {
-    let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
+    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
         return StatusCode::NOT_FOUND;
     };
 
     let old: T = row.into();
 
-    if let Err(_) = T::update_is_valid(&mut new, old) {
+    if let Err(_) = T::validate_update(&mut new, old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::update_query(&new)).await {
+    match pool.execute(T::prepare_update(&new)).await {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -61,17 +61,17 @@ pub async fn update<T>(
 pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
     where T: From<AnyRow> + Retriever + Deleter
 {
-    let Ok(row) = pool.fetch_one(T::retrieve_query(id)).await else {
+    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
         return StatusCode::NOT_FOUND;
     };
 
     let old: T = row.into();
 
-    if let Err(_) = T::delete_is_valid(&old) {
+    if let Err(_) = T::validate_delete(&old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::delete_query(id)).await {
+    match pool.execute(T::prepare_delete(id)).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -100,7 +100,7 @@ mod tests {
 
         for i in 1..=size {
             let _ = pool.execute(
-                Dummy::create_query(
+                Dummy::prepare_create(
                     &(Dummy { id_dummy: i, name: format!("name-{}", i), is_valid: Some(true) })
                 )
             ).await;
@@ -137,7 +137,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool.fetch_one(Dummy::retrieve_query(1)).await.unwrap().into();
+        let dummy: Dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await.unwrap().into();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -340,7 +340,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool.fetch_one(Dummy::retrieve_query(1)).await.unwrap().into();
+        let dummy: Dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await.unwrap().into();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);
@@ -515,7 +515,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = pool.fetch_one(Dummy::retrieve_query(1)).await;
+        let dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -584,7 +584,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = pool.fetch_one(Dummy::retrieve_query(1)).await;
+        let dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());

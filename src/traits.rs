@@ -1,30 +1,30 @@
 use sqlx::any::AnyArguments;
 
 pub trait Creator {
-    fn create_is_valid(&mut self) -> Result<(), String> {
+    fn validate_create(&mut self) -> Result<(), String> {
         Ok(())
     }
 
-    fn create_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
+    fn prepare_create<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
 }
 
 pub trait Retriever {
-    fn retrieve_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
+    fn prepare_retrieve<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
 }
 
 pub trait Updater<T> {
-    fn update_is_valid(&mut self, old: T) -> Result<(), String> {
+    fn validate_update(&mut self, old: T) -> Result<(), String> {
         let _ = old;
         Ok(())
     }
 
-    fn update_query<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
+    fn prepare_update<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
 }
 
 pub trait Deleter {
-    fn delete_is_valid(&self) -> Result<(), String> {
+    fn validate_delete(&self) -> Result<(), String> {
         Ok(())
     }
 
-    fn delete_query<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
+    fn prepare_delete<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
 }
