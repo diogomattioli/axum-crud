@@ -6,7 +6,7 @@ use axum::{
 };
 
 use serde::Serialize;
-use sqlx::{ any::AnyRow, Any, Executor, FromRow, Pool };
+use sqlx::{ any::AnyRow, Any, FromRow, Pool };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
@@ -17,7 +17,7 @@ pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) ->
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::prepare_create(&new)).await {
+    match T::prepare_create(&new).execute(&pool).await {
         Ok(_) => StatusCode::CREATED,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -27,7 +27,7 @@ pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> 
     where T: Retriever<T> + Serialize + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
     match T::prepare_retrieve(id).fetch_one(&pool).await {
-        Ok(value) => (StatusCode::OK, Json(value)).into_response(),
+        Ok(old) => (StatusCode::OK, Json(old)).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -47,7 +47,7 @@ pub async fn update<T>(
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::prepare_update(&new)).await {
+    match T::prepare_update(&new).execute(&pool).await {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -64,7 +64,7 @@ pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> St
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match pool.execute(T::prepare_delete(id)).await {
+    match T::prepare_delete(id).execute(&pool).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
