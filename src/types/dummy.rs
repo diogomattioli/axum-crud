@@ -1,5 +1,5 @@
 use serde::{ Deserialize, Serialize };
-use sqlx::{ any::{ AnyArguments, AnyRow }, Row };
+use sqlx::{ any::{ AnyArguments, AnyRow }, query::Query, Any, Row };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
@@ -18,13 +18,13 @@ impl Creator for Dummy {
         }
     }
 
-    fn prepare_create<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>> {
+    fn prepare_create<'a>(&self) -> Query<'a, Any, AnyArguments<'a>> {
         sqlx::query("INSERT INTO dummy VALUES ($1, $2)").bind(self.id_dummy).bind(self.name.clone())
     }
 }
 
 impl Retriever for Dummy {
-    fn prepare_retrieve<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>> {
+    fn prepare_retrieve<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>> {
         sqlx::query("SELECT * FROM dummy WHERE id_dummy = $1").bind(id)
     }
 }
@@ -38,7 +38,7 @@ impl Updater<Self> for Dummy {
         }
     }
 
-    fn prepare_update<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>> {
+    fn prepare_update<'a>(&self) -> Query<'a, Any, AnyArguments<'a>> {
         sqlx::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
             .bind(self.id_dummy)
             .bind(self.name.clone())
@@ -53,7 +53,7 @@ impl Deleter for Dummy {
         }
     }
 
-    fn prepare_delete<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>> {
+    fn prepare_delete<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>> {
         sqlx::query("DELETE FROM dummy WHERE id_dummy = $1").bind(id)
     }
 }

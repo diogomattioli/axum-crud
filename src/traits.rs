@@ -1,15 +1,15 @@
-use sqlx::any::AnyArguments;
+use sqlx::{ any::AnyArguments, query::Query, Any };
 
 pub trait Creator {
     fn validate_create(&mut self) -> Result<(), String> {
         Ok(())
     }
 
-    fn prepare_create<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
+    fn prepare_create<'a>(&self) -> Query<'a, Any, AnyArguments<'a>>;
 }
 
 pub trait Retriever {
-    fn prepare_retrieve<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
+    fn prepare_retrieve<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>>;
 }
 
 pub trait Updater<T> {
@@ -18,7 +18,7 @@ pub trait Updater<T> {
         Ok(())
     }
 
-    fn prepare_update<'e>(&self) -> sqlx::query::Query<'e, sqlx::Any, AnyArguments<'e>>;
+    fn prepare_update<'a>(&self) -> Query<'a, Any, AnyArguments<'a>>;
 }
 
 pub trait Deleter {
@@ -26,5 +26,5 @@ pub trait Deleter {
         Ok(())
     }
 
-    fn prepare_delete<'a>(id: i64) -> sqlx::query::Query<'a, sqlx::Any, AnyArguments<'a>>;
+    fn prepare_delete<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>>;
 }
