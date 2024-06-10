@@ -24,12 +24,17 @@ pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) ->
 }
 
 pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
-    where T: From<AnyRow> + Retriever + Serialize
+    where T: TryFrom<AnyRow> + Retriever + Serialize
 {
-    match pool.fetch_one(T::prepare_retrieve(id)).await {
-        Ok(row) => (StatusCode::OK, Json(Into::<T>::into(row))).into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
-    }
+    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    let Ok(old) = TryInto::<T>::try_into(row) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    (StatusCode::OK, Json(old)).into_response()
 }
 
 pub async fn update<T>(
@@ -37,13 +42,15 @@ pub async fn update<T>(
     Path(id): Path<i64>,
     Json(mut new): Json<T>
 ) -> StatusCode
-    where T: From<AnyRow> + Retriever + Updater<T>
+    where T: TryFrom<AnyRow> + Retriever + Updater<T>
 {
     let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
         return StatusCode::NOT_FOUND;
     };
 
-    let old: T = row.into();
+    let Ok(old) = row.try_into() else {
+        return StatusCode::NOT_FOUND;
+    };
 
     if let Err(_) = T::validate_update(&mut new, old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
@@ -56,13 +63,15 @@ pub async fn update<T>(
 }
 
 pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
-    where T: From<AnyRow> + Retriever + Deleter
+    where T: TryFrom<AnyRow> + Retriever + Deleter
 {
     let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
         return StatusCode::NOT_FOUND;
     };
 
-    let old: T = row.into();
+    let Ok(old) = row.try_into() else {
+        return StatusCode::NOT_FOUND;
+    };
 
     if let Err(_) = T::validate_delete(&old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
@@ -134,7 +143,11 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await.unwrap().into();
+        let dummy: Dummy = pool
+            .fetch_one(Dummy::prepare_retrieve(1)).await
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -337,7 +350,11 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await.unwrap().into();
+        let dummy: Dummy = pool
+            .fetch_one(Dummy::prepare_retrieve(1)).await
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);

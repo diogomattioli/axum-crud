@@ -1,5 +1,5 @@
 use serde::{ Deserialize, Serialize };
-use sqlx::{ any::{ AnyArguments, AnyRow }, query::Query, Any, Row };
+use sqlx::{ any::{ AnyArguments, AnyRow }, query::Query, Any, Error, Row };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
@@ -58,12 +58,14 @@ impl Deleter for Dummy {
     }
 }
 
-impl From<AnyRow> for Dummy {
-    fn from(row: AnyRow) -> Self {
-        Dummy {
-            id_dummy: row.try_get("id_dummy").unwrap(),
-            name: row.try_get("name").unwrap(),
+impl TryFrom<AnyRow> for Dummy {
+    type Error = Error;
+
+    fn try_from(row: AnyRow) -> Result<Self, Self::Error> {
+        Ok(Dummy {
+            id_dummy: row.try_get("id_dummy")?,
+            name: row.try_get("name")?,
             is_valid: Some(true),
-        }
+        })
     }
 }
