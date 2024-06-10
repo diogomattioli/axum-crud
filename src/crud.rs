@@ -8,7 +8,7 @@ use axum::{
 use serde::Serialize;
 use sqlx::{ any::AnyRow, Any, FromRow, Pool, Row };
 
-use crate::traits::{ Creator, Deleter, Retriever, Updater };
+use crate::traits::{ Creator, Deleter, Retriever, Sub, Updater };
 
 pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> Response
     where T: Creator
@@ -103,9 +103,9 @@ pub async fn sub_retrieve<T, T2>(
     -> Response
     where
         T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
-        T2: Retriever<T2> + Serialize + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+        T2: Sub + Retriever<T2> + Serialize + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+    if T2::prepare_sub_match(id, sub_id).fetch_one(&pool).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -120,9 +120,9 @@ pub async fn sub_update<T, T2>(
     -> StatusCode
     where
         T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
-        T2: Retriever<T2> + Updater<T2> + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+        T2: Sub + Retriever<T2> + Updater<T2> + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+    if T2::prepare_sub_match(id, sub_id).fetch_one(&pool).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
@@ -136,9 +136,9 @@ pub async fn sub_delete<T, T2>(
     -> StatusCode
     where
         T: Retriever<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>,
-        T2: Retriever<T2> + Deleter + Send + Unpin + for<'a> FromRow<'a, AnyRow>
+        T2: Sub + Retriever<T2> + Deleter + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    if T::prepare_retrieve(id).fetch_one(&pool).await.is_err() {
+    if T2::prepare_sub_match(id, sub_id).fetch_one(&pool).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 

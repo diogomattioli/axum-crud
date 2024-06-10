@@ -1,7 +1,7 @@
 use serde::{ Deserialize, Serialize };
 use sqlx::{ any::AnyArguments, query::{ Query, QueryAs }, Any, FromRow };
 
-use crate::traits::{ Creator, Deleter, Retriever, Updater };
+use crate::traits::{ Creator, Deleter, Retriever, Sub, Updater };
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct SubDummy {
@@ -61,5 +61,15 @@ impl Deleter for SubDummy {
 
     fn prepare_delete<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>> {
         sqlx::query("DELETE FROM sub_dummy WHERE id_sub_dummy = $1").bind(id)
+    }
+}
+
+impl Sub for SubDummy {
+    fn prepare_sub_match<'a>(id: i64, sub_id: i64) -> Query<'a, Any, AnyArguments<'a>> {
+        sqlx::query(
+            "SELECT * FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
+        )
+            .bind(id)
+            .bind(sub_id)
     }
 }
