@@ -32,10 +32,7 @@ pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> 
 
     let old: T = row.into();
 
-    match serde_json::to_value(old) {
-        Ok(value) => (StatusCode::OK, Json(value)).into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+    (StatusCode::OK, Json(old)).into_response()
 }
 
 pub async fn update<T>(
