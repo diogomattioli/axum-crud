@@ -6,7 +6,7 @@ use axum::{
 };
 
 use serde::Serialize;
-use sqlx::{ any::AnyRow, Any, Executor, Pool };
+use sqlx::{ any::AnyRow, Any, Executor, FromRow, Pool };
 
 use crate::traits::{ Creator, Deleter, Retriever, Updater };
 
@@ -24,17 +24,12 @@ pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) ->
 }
 
 pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
-    where T: TryFrom<AnyRow> + Retriever + Serialize
+    where T: Retriever<T> + Serialize + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-
-    let Ok(old) = TryInto::<T>::try_into(row) else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-
-    (StatusCode::OK, Json(old)).into_response()
+    match T::prepare_retrieve(id).fetch_one(&pool).await {
+        Ok(value) => (StatusCode::OK, Json(value)).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 pub async fn update<T>(
@@ -42,13 +37,9 @@ pub async fn update<T>(
     Path(id): Path<i64>,
     Json(mut new): Json<T>
 ) -> StatusCode
-    where T: TryFrom<AnyRow> + Retriever + Updater<T>
+    where T: Retriever<T> + Updater<T> + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
-        return StatusCode::NOT_FOUND;
-    };
-
-    let Ok(old) = row.try_into() else {
+    let Ok(old) = T::prepare_retrieve(id).fetch_one(&pool).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -63,13 +54,9 @@ pub async fn update<T>(
 }
 
 pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
-    where T: TryFrom<AnyRow> + Retriever + Deleter
+    where T: Retriever<T> + Deleter + Send + Unpin + for<'a> FromRow<'a, AnyRow>
 {
-    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
-        return StatusCode::NOT_FOUND;
-    };
-
-    let Ok(old) = row.try_into() else {
+    let Ok(old) = T::prepare_retrieve(id).fetch_one(&pool).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -143,11 +130,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool
-            .fetch_one(Dummy::prepare_retrieve(1)).await
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let dummy = Dummy::prepare_retrieve(1).fetch_one(&pool).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -350,11 +333,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy: Dummy = pool
-            .fetch_one(Dummy::prepare_retrieve(1)).await
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let dummy = Dummy::prepare_retrieve(1).fetch_one(&pool).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);
@@ -529,7 +508,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await;
+        let dummy = Dummy::prepare_retrieve(1).fetch_one(&pool).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -598,7 +577,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = pool.fetch_one(Dummy::prepare_retrieve(1)).await;
+        let dummy = Dummy::prepare_retrieve(1).fetch_one(&pool).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
