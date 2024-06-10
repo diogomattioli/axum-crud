@@ -26,13 +26,10 @@ pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) ->
 pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
     where T: From<AnyRow> + Retriever + Serialize
 {
-    let Ok(row) = pool.fetch_one(T::prepare_retrieve(id)).await else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-
-    let old: T = row.into();
-
-    (StatusCode::OK, Json(old)).into_response()
+    match pool.fetch_one(T::prepare_retrieve(id)).await {
+        Ok(row) => (StatusCode::OK, Json(Into::<T>::into(row))).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 pub async fn update<T>(
