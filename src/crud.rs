@@ -13,7 +13,7 @@ use crate::traits::{ Creator, Deleter, Retriever, Updater };
 pub async fn create<T>(State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> StatusCode
     where T: Creator
 {
-    if let Err(_) = new.create_is_valid() {
+    if let Err(_) = T::create_is_valid(&mut new) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -51,7 +51,7 @@ pub async fn update<T>(
 
     let old: T = row.into();
 
-    if let Err(_) = new.update_is_valid(old) {
+    if let Err(_) = T::update_is_valid(&mut new, old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -70,7 +70,7 @@ pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> St
 
     let old: T = row.into();
 
-    if let Err(_) = old.delete_is_valid() {
+    if let Err(_) = T::delete_is_valid(&old) {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
