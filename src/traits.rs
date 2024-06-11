@@ -29,6 +29,6 @@ pub trait Deleter {
     fn prepare_delete<'a>(id: i64) -> Query<'a, Any, AnyArguments<'a>>;
 }
 
-pub trait Sub {
+pub trait Sub<T> {
     fn prepare_sub_match<'a>(id: i64, sub_id: i64) -> Query<'a, Any, AnyArguments<'a>>;
 }
