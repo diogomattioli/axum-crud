@@ -23,7 +23,7 @@ impl Creator for SubDummy {
         }
     }
 
-    async fn prepare_create(&self, pool: &Pool) -> Result<i64> {
+    async fn database_create(&self, pool: &Pool) -> Result<i64> {
         sqlx::query("INSERT INTO sub_dummy VALUES ($1, $2, $3) RETURNING id_sub_dummy")
             .bind(self.id_sub_dummy)
             .bind(self.name.clone())
@@ -34,7 +34,7 @@ impl Creator for SubDummy {
 }
 
 impl Retriever<Self> for SubDummy {
-    async fn prepare_retrieve(pool: &Pool, id: i64) -> Result<Self> {
+    async fn database_retrieve(pool: &Pool, id: i64) -> Result<Self> {
         sqlx
             ::query_as("SELECT * FROM sub_dummy WHERE id_sub_dummy = $1")
             .bind(id)
@@ -51,7 +51,7 @@ impl Updater<Self> for SubDummy {
         }
     }
 
-    async fn prepare_update(&self, pool: &Pool) -> Result<()> {
+    async fn database_update(&self, pool: &Pool) -> Result<()> {
         sqlx::query("UPDATE sub_dummy SET name = $2, id_dummy = $3 WHERE id_sub_dummy = $1")
             .bind(self.id_sub_dummy)
             .bind(self.name.clone())
@@ -69,7 +69,7 @@ impl Deleter for SubDummy {
         }
     }
 
-    async fn prepare_delete(pool: &Pool, id: i64) -> Result<()> {
+    async fn database_delete(pool: &Pool, id: i64) -> Result<()> {
         sqlx::query("DELETE FROM sub_dummy WHERE id_sub_dummy = $1")
             .bind(id)
             .execute(pool).await
@@ -78,7 +78,7 @@ impl Deleter for SubDummy {
 }
 
 impl Sub<Dummy> for SubDummy {
-    async fn prepare_sub_match(pool: &Pool, id: i64, sub_id: i64) -> Result<Dummy> {
+    async fn database_match_sub(pool: &Pool, id: i64, sub_id: i64) -> Result<Dummy> {
         sqlx
             ::query_as(
                 "SELECT * FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"

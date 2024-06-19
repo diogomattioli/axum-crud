@@ -19,7 +19,7 @@ impl Creator for Dummy {
         }
     }
 
-    async fn prepare_create(&self, pool: &Pool) -> Result<i64> {
+    async fn database_create(&self, pool: &Pool) -> Result<i64> {
         sqlx::query("INSERT INTO dummy VALUES ($1, $2) RETURNING id_dummy")
             .bind(self.id_dummy)
             .bind(self.name.clone())
@@ -29,7 +29,7 @@ impl Creator for Dummy {
 }
 
 impl Retriever<Self> for Dummy {
-    async fn prepare_retrieve(pool: &Pool, id: i64) -> Result<Self> {
+    async fn database_retrieve(pool: &Pool, id: i64) -> Result<Self> {
         sqlx::query_as("SELECT * FROM dummy WHERE id_dummy = $1").bind(id).fetch_one(pool).await
     }
 }
@@ -43,7 +43,7 @@ impl Updater<Self> for Dummy {
         }
     }
 
-    async fn prepare_update(&self, pool: &Pool) -> Result<()> {
+    async fn database_update(&self, pool: &Pool) -> Result<()> {
         sqlx::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
             .bind(self.id_dummy)
             .bind(self.name.clone())
@@ -60,7 +60,7 @@ impl Deleter for Dummy {
         }
     }
 
-    async fn prepare_delete(pool: &Pool, id: i64) -> Result<()> {
+    async fn database_delete(pool: &Pool, id: i64) -> Result<()> {
         sqlx::query("DELETE FROM dummy WHERE id_dummy = $1")
             .bind(id)
             .execute(pool).await

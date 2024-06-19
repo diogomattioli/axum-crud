@@ -8,11 +8,11 @@ pub trait Creator {
         Ok(())
     }
 
-    async fn prepare_create(&self, pool: &Pool) -> Result<i64>;
+    async fn database_create(&self, pool: &Pool) -> Result<i64>;
 }
 
 pub trait Retriever<T> {
-    async fn prepare_retrieve(pool: &Pool, id: i64) -> Result<T>;
+    async fn database_retrieve(pool: &Pool, id: i64) -> Result<T>;
 }
 
 pub trait Updater<T> {
@@ -21,7 +21,7 @@ pub trait Updater<T> {
         Ok(())
     }
 
-    async fn prepare_update(&self, pool: &Pool) -> Result<()>;
+    async fn database_update(&self, pool: &Pool) -> Result<()>;
 }
 
 pub trait Deleter {
@@ -29,9 +29,9 @@ pub trait Deleter {
         Ok(())
     }
 
-    async fn prepare_delete(pool: &Pool, id: i64) -> Result<()>;
+    async fn database_delete(pool: &Pool, id: i64) -> Result<()>;
 }
 
 pub trait Sub<T> {
-    async fn prepare_sub_match(pool: &Pool, id: i64, sub_id: i64) -> Result<T>;
+    async fn database_match_sub(pool: &Pool, id: i64, sub_id: i64) -> Result<T>;
 }

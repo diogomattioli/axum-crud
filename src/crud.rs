@@ -17,7 +17,7 @@ pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): J
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
-    match T::prepare_create(&new, &pool).await {
+    match T::database_create(&new, &pool).await {
         Ok(id) => {
             (
                 StatusCode::CREATED,
@@ -35,7 +35,7 @@ pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): J
 pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
     where T: Retriever<T> + Serialize
 {
-    match T::prepare_retrieve(&pool, id).await {
+    match T::database_retrieve(&pool, id).await {
         Ok(old) => (StatusCode::OK, Json(old)).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
@@ -48,7 +48,7 @@ pub async fn update<T>(
 ) -> StatusCode
     where T: Retriever<T> + Updater<T>
 {
-    let Ok(old) = T::prepare_retrieve(&pool, id).await else {
+    let Ok(old) = T::database_retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -56,7 +56,7 @@ pub async fn update<T>(
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match T::prepare_update(&new, &pool).await {
+    match T::database_update(&new, &pool).await {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -65,7 +65,7 @@ pub async fn update<T>(
 pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
     where T: Retriever<T> + Deleter
 {
-    let Ok(old) = T::prepare_retrieve(&pool, id).await else {
+    let Ok(old) = T::database_retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -73,7 +73,7 @@ pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> St
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match T::prepare_delete(&pool, id).await {
+    match T::database_delete(&pool, id).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
@@ -88,7 +88,7 @@ pub async fn sub_create<T, T2>(
     -> Response
     where T: Retriever<T>, T2: Creator
 {
-    if T::prepare_retrieve(&pool, id).await.is_err() {
+    if T::database_retrieve(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -102,7 +102,7 @@ pub async fn sub_retrieve<T, T2>(
     -> Response
     where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Serialize
 {
-    if T2::prepare_sub_match(&pool, id, sub_id).await.is_err() {
+    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -117,7 +117,7 @@ pub async fn sub_update<T, T2>(
     -> StatusCode
     where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Updater<T2>
 {
-    if T2::prepare_sub_match(&pool, id, sub_id).await.is_err() {
+    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
@@ -131,7 +131,7 @@ pub async fn sub_delete<T, T2>(
     -> StatusCode
     where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Deleter
 {
-    if T2::prepare_sub_match(&pool, id, sub_id).await.is_err() {
+    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
@@ -170,11 +170,11 @@ mod tests {
         ).await;
 
         for i in 1..=size {
-            let _ = Dummy::prepare_create(
+            let _ = Dummy::database_create(
                 &(Dummy { id_dummy: i, name: format!("name-{}", i), is_valid: Some(true) }),
                 &pool
             ).await;
-            let _ = SubDummy::prepare_create(
+            let _ = SubDummy::database_create(
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
@@ -221,7 +221,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = Dummy::prepare_retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::database_retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -410,7 +410,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 2).await.unwrap();
+        let dummy = SubDummy::database_retrieve(&pool, 2).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -438,7 +438,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert!(SubDummy::prepare_retrieve(&pool, 2).await.is_err());
+        assert!(SubDummy::database_retrieve(&pool, 2).await.is_err());
     }
 
     #[tokio::test]
@@ -604,7 +604,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = Dummy::prepare_retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::database_retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);
@@ -779,7 +779,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -806,7 +806,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -833,7 +833,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -860,7 +860,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = Dummy::prepare_retrieve(&pool, 1).await;
+        let dummy = Dummy::database_retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -929,7 +929,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = Dummy::prepare_retrieve(&pool, 1).await;
+        let dummy = Dummy::database_retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -954,7 +954,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await;
+        let dummy = SubDummy::database_retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -979,7 +979,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await;
+        let dummy = SubDummy::database_retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());
@@ -1004,7 +1004,7 @@ mod tests {
             ).await
             .unwrap();
 
-        let dummy = SubDummy::prepare_retrieve(&pool, 1).await;
+        let dummy = SubDummy::database_retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());
