@@ -25,7 +25,6 @@ pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): J
                     ("Location", format!("{}{}", uri.path(), id)),
                     ("X-Item-ID", format!("{}", id)),
                 ],
-                "",
             ).into_response()
         }
         Err(_) => StatusCode::NOT_ACCEPTABLE.into_response(),
