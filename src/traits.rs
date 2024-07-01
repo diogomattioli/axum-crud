@@ -32,6 +32,11 @@ pub trait Deleter {
     async fn database_delete(pool: &Pool, id: i64) -> Result<()>;
 }
 
+pub trait Enumerator<T> {
+    async fn database_count(pool: &Pool) -> Result<i64>;
+    async fn database_list(pool: &Pool, offset: i64, limit: i64) -> Result<Vec<T>>;
+}
+
 pub trait Sub<T> {
     async fn database_match_sub(pool: &Pool, id: i64, sub_id: i64) -> Result<T>;
 }

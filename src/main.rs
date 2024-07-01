@@ -1,4 +1,5 @@
 mod crud;
+mod list;
 mod traits;
 mod types;
 
@@ -21,6 +22,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
+        .route("/dummy/", get(list::list::<Dummy>))
         .route("/dummy/", post(crud::create::<Dummy>))
         .route("/dummy/:id", get(crud::retrieve::<Dummy>))
         .route("/dummy/:id", put(crud::update::<Dummy>))

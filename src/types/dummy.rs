@@ -1,7 +1,7 @@
 use serde::{ Deserialize, Serialize };
 use sqlx::{ FromRow, Row };
 
-use crate::traits::{ Creator, Deleter, Pool, Result, ResultErr, Retriever, Updater };
+use crate::traits::{ Creator, Deleter, Enumerator, Pool, Result, ResultErr, Retriever, Updater };
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Dummy {
@@ -65,5 +65,19 @@ impl Deleter for Dummy {
             .bind(id)
             .execute(pool).await
             .map(|_| ())
+    }
+}
+
+impl Enumerator<Self> for Dummy {
+    async fn database_count(pool: &Pool) -> Result<i64> {
+        sqlx::query("SELECT count(id_dummy) FROM dummy").fetch_one(pool).await?.try_get(0)
+    }
+
+    async fn database_list(pool: &Pool, offset: i64, limit: i64) -> Result<Vec<Self>> {
+        sqlx
+            ::query_as("SELECT * FROM dummy limit $1, $2")
+            .bind(offset)
+            .bind(limit)
+            .fetch_all(pool).await
     }
 }
