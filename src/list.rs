@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::Database;
+use crate::{Database, Pool};
 
 #[derive(Deserialize)]
 pub struct QueryParams {
@@ -16,9 +16,9 @@ pub struct QueryParams {
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 250;
 
-pub async fn list<P, T>(State(pool): State<P>, Query(query): Query<QueryParams>) -> Response
+pub async fn list<T>(State(pool): State<Pool>, Query(query): Query<QueryParams>) -> Response
 where
-    T: Database<P, Item = T> + Serialize,
+    T: Database<Pool, Item = T> + Serialize,
 {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
@@ -62,8 +62,8 @@ mod tests {
     };
 
     use crate::{
+        prelude::*,
         types::{dummy::Dummy, sub_dummy::SubDummy},
-        Database, SqlxPool,
     };
     use http_body_util::BodyExt;
     use sqlx::{any::AnyPoolOptions, Any, Executor, Pool};
@@ -116,7 +116,7 @@ mod tests {
 
     async fn app(pool: Pool<Any>) -> axum::Router {
         Router::new()
-            .route("/dummy/", get(super::list::<SqlxPool, Dummy>))
+            .route("/dummy/", get(super::list::<Dummy>))
             // .route("/dummy/:id/subdummy/", get(crud::sub_retrieve::<Dummy, SubDummy>))
             .with_state(pool)
     }

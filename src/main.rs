@@ -13,6 +13,8 @@ use prelude::*;
 use sqlx::any::AnyPoolOptions;
 use types::dummy::Dummy;
 
+pub type Pool = SqlxPool;
+
 #[tokio::main]
 async fn main() {
     let Ok(database_url) = env::var("DATABASE_URL") else {
@@ -30,11 +32,11 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/dummy/", get(list::list::<SqlxPool, Dummy>))
-        .route("/dummy/", post(crud::create::<SqlxPool, Dummy>))
-        .route("/dummy/:id", get(crud::retrieve::<SqlxPool, Dummy>))
-        .route("/dummy/:id", put(crud::update::<SqlxPool, Dummy>))
-        .route("/dummy/:id", delete(crud::delete::<SqlxPool, Dummy>))
+        .route("/dummy/", get(list::list::<Dummy>))
+        .route("/dummy/", post(crud::create::<Dummy>))
+        .route("/dummy/:id", get(crud::retrieve::<Dummy>))
+        .route("/dummy/:id", put(crud::update::<Dummy>))
+        .route("/dummy/:id", delete(crud::delete::<Dummy>))
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();

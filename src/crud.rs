@@ -7,11 +7,11 @@ use axum::{
 
 use serde::Serialize;
 
-use crate::prelude::*;
+use crate::{prelude::*, Pool};
 
-pub async fn create<P, T>(uri: Uri, State(pool): State<P>, Json(mut new): Json<T>) -> Response
+pub async fn create<T>(uri: Uri, State(pool): State<Pool>, Json(mut new): Json<T>) -> Response
 where
-    T: Database<P, Item = T> + Check,
+    T: Database<Pool, Item = T> + Check,
 {
     if T::check_create(&mut new).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
@@ -30,9 +30,9 @@ where
     }
 }
 
-pub async fn retrieve<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> Response
+pub async fn retrieve<T>(State(pool): State<Pool>, Path(id): Path<i64>) -> Response
 where
-    T: Database<P, Item = T> + Serialize,
+    T: Database<Pool, Item = T> + Serialize,
 {
     match T::fetch_one(&pool, id).await {
         Ok(old) => (StatusCode::OK, Json(old)).into_response(),
@@ -40,13 +40,13 @@ where
     }
 }
 
-pub async fn update<P, T>(
-    State(pool): State<P>,
+pub async fn update<T>(
+    State(pool): State<Pool>,
     Path(id): Path<i64>,
     Json(mut new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<P, Item = T> + Check<Item = T>,
+    T: Database<Pool, Item = T> + Check<Item = T>,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
@@ -62,9 +62,9 @@ where
     }
 }
 
-pub async fn delete<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> StatusCode
+pub async fn delete<T>(State(pool): State<Pool>, Path(id): Path<i64>) -> StatusCode
 where
-    T: Database<P, Item = T> + Check,
+    T: Database<Pool, Item = T> + Check,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
@@ -80,67 +80,67 @@ where
     }
 }
 
-pub async fn sub_create<P, T, T2>(
+pub async fn sub_create<T, T2>(
     uri: Uri,
-    State(pool): State<P>,
+    State(pool): State<Pool>,
     Path(id): Path<i64>,
     Json(new): Json<T2>,
 ) -> Response
 where
-    T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Check,
+    T: Database<Pool, Item = T>,
+    T2: Database<Pool, Item = T2> + Check,
 {
     if T::fetch_one(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    create::<P, T2>(uri, State(pool), Json(new)).await
+    create::<T2>(uri, State(pool), Json(new)).await
 }
 
-pub async fn sub_retrieve<P, T, T2>(
-    State(pool): State<P>,
+pub async fn sub_retrieve<T, T2>(
+    State(pool): State<Pool>,
     Path((id, sub_id)): Path<(i64, i64)>,
 ) -> Response
 where
-    T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Serialize,
+    T: Database<Pool, Item = T>,
+    T2: Database<Pool, Item = T2> + Serialize,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    retrieve::<P, T2>(State(pool), Path(sub_id)).await
+    retrieve::<T2>(State(pool), Path(sub_id)).await
 }
 
-pub async fn sub_update<P, T, T2>(
-    State(pool): State<P>,
+pub async fn sub_update<T, T2>(
+    State(pool): State<Pool>,
     Path((id, sub_id)): Path<(i64, i64)>,
     Json(new): Json<T2>,
 ) -> StatusCode
 where
-    T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Check<Item = T2>,
+    T: Database<Pool, Item = T>,
+    T2: Database<Pool, Item = T2> + Check<Item = T2>,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
-    update::<P, T2>(State(pool), Path(sub_id), Json(new)).await
+    update::<T2>(State(pool), Path(sub_id), Json(new)).await
 }
 
-pub async fn sub_delete<P, T, T2>(
-    State(pool): State<P>,
+pub async fn sub_delete<T, T2>(
+    State(pool): State<Pool>,
     Path((id, sub_id)): Path<(i64, i64)>,
 ) -> StatusCode
 where
-    T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Check,
+    T: Database<Pool, Item = T>,
+    T2: Database<Pool, Item = T2> + Check,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
-    delete::<P, T2>(State(pool), Path(sub_id)).await
+    delete::<T2>(State(pool), Path(sub_id)).await
 }
 
 #[cfg(test)]
@@ -208,25 +208,25 @@ mod tests {
 
     async fn app(pool: Pool<Any>) -> axum::Router {
         Router::new()
-            .route("/dummy/", post(crud::create::<SqlxPool, Dummy>))
-            .route("/dummy/:id", get(crud::retrieve::<SqlxPool, Dummy>))
-            .route("/dummy/:id", put(crud::update::<SqlxPool, Dummy>))
-            .route("/dummy/:id", delete(crud::delete::<SqlxPool, Dummy>))
+            .route("/dummy/", post(crud::create::<Dummy>))
+            .route("/dummy/:id", get(crud::retrieve::<Dummy>))
+            .route("/dummy/:id", put(crud::update::<Dummy>))
+            .route("/dummy/:id", delete(crud::delete::<Dummy>))
             .route(
                 "/dummy/:id/subdummy/",
-                post(crud::sub_create::<SqlxPool, Dummy, SubDummy>),
+                post(crud::sub_create::<Dummy, SubDummy>),
             )
             .route(
                 "/dummy/:id/subdummy/:id",
-                get(crud::sub_retrieve::<SqlxPool, Dummy, SubDummy>),
+                get(crud::sub_retrieve::<Dummy, SubDummy>),
             )
             .route(
                 "/dummy/:id/subdummy/:id",
-                put(crud::sub_update::<SqlxPool, Dummy, SubDummy>),
+                put(crud::sub_update::<Dummy, SubDummy>),
             )
             .route(
                 "/dummy/:id/subdummy/:id",
-                delete(crud::sub_delete::<SqlxPool, Dummy, SubDummy>),
+                delete(crud::sub_delete::<Dummy, SubDummy>),
             )
             .with_state(pool)
     }
