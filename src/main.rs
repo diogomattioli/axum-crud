@@ -1,11 +1,15 @@
 mod crud;
 mod list;
+mod prelude;
 mod traits;
 mod types;
 
 use std::env;
 
-use axum::{ routing::{ delete, get, post, put }, Router };
+use axum::{
+    routing::{delete, get, post, put},
+    Router,
+};
 use sqlx::any::AnyPoolOptions;
 use types::dummy::Dummy;
 
@@ -16,7 +20,11 @@ async fn main() {
     };
 
     sqlx::any::install_default_drivers();
-    let Ok(pool) = AnyPoolOptions::new().max_connections(5).connect(&database_url).await else {
+    let Ok(pool) = AnyPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+    else {
         panic!("Cannot connect to the database");
     };
 
