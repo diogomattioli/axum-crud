@@ -69,7 +69,7 @@ mod tests {
     use sqlx::{any::AnyPoolOptions, Any, Executor, Pool};
     use tower::ServiceExt;
 
-    async fn setup_db(size: i64) -> Pool<Any> {
+    async fn database(size: i64) -> Pool<Any> {
         sqlx::any::install_default_drivers();
         let pool = AnyPoolOptions::new()
             .max_connections(1) // needs to be 1, otherwise memory database is gone
@@ -123,7 +123,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_ok() {
-        let pool = setup_db(10).await;
+        let pool = database(10).await;
 
         let app = router(pool.clone()).await;
 
@@ -151,7 +151,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_empty() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -174,7 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_paging_total() {
-        let pool = setup_db(100).await;
+        let pool = database(100).await;
 
         let app = router(pool.clone()).await;
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_paging_size() {
-        let pool = setup_db(100).await;
+        let pool = database(100).await;
 
         let app = router(pool.clone()).await;
 
@@ -234,7 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_offset_and_limit() {
-        let pool = setup_db(100).await;
+        let pool = database(100).await;
 
         let app = router(pool.clone()).await;
 
@@ -270,7 +270,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_offset() {
-        let pool = setup_db(100).await;
+        let pool = database(100).await;
 
         let app = router(pool.clone()).await;
 
@@ -306,7 +306,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_limit() {
-        let pool = setup_db(100).await;
+        let pool = database(100).await;
 
         let app = router(pool.clone()).await;
 

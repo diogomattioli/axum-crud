@@ -161,7 +161,7 @@ mod tests {
     use sqlx::{any::AnyPoolOptions, Any, Executor, Pool};
     use tower::ServiceExt;
 
-    async fn setup_db(size: i64) -> Pool<Any> {
+    async fn database(size: i64) -> Pool<Any> {
         sqlx::any::install_default_drivers();
         let pool = AnyPoolOptions::new()
             .max_connections(1) // needs to be 1, otherwise memory database is gone
@@ -233,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_ok() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -260,7 +260,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_ok_location() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -290,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_ok_x_item_id() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -320,7 +320,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_empty() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -343,7 +343,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_invalid() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -366,7 +366,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_bad_json() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -389,7 +389,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_no_content_type() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -411,7 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_wrong_content_type() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -434,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_sub_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -462,7 +462,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_sub_not_found() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -486,7 +486,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -515,7 +515,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_inexsistent() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -538,7 +538,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_bad_id() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -561,7 +561,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_sub_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -590,7 +590,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_sub_not_found() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -613,7 +613,7 @@ mod tests {
 
     #[tokio::test]
     async fn retrieve_sub_mismatch() {
-        let pool = setup_db(2).await;
+        let pool = database(2).await;
 
         let app = router(pool.clone()).await;
 
@@ -636,7 +636,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -663,7 +663,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_no_content_type() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -685,7 +685,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_wrong_content_type() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -708,7 +708,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_empty() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -731,7 +731,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_bad_id() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -754,7 +754,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_bad_json() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -777,7 +777,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_inexistent() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -800,7 +800,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_invalid() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -823,7 +823,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_sub_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -851,7 +851,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_sub_not_found() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -879,7 +879,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_sub_mismatch() {
-        let pool = setup_db(2).await;
+        let pool = database(2).await;
 
         let app = router(pool.clone()).await;
 
@@ -907,7 +907,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -933,7 +933,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_bad_id() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -956,7 +956,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_inexistent() {
-        let pool = setup_db(0).await;
+        let pool = database(0).await;
 
         let app = router(pool.clone()).await;
 
@@ -979,7 +979,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_invalid() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -1005,7 +1005,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_sub_ok() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -1031,7 +1031,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_sub_not_found() {
-        let pool = setup_db(1).await;
+        let pool = database(1).await;
 
         let app = router(pool.clone()).await;
 
@@ -1057,7 +1057,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_sub_mismatch() {
-        let pool = setup_db(2).await;
+        let pool = database(2).await;
 
         let app = router(pool.clone()).await;
 
