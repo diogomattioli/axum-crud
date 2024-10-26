@@ -1,7 +1,7 @@
 mod crud;
 mod list;
 mod prelude;
-mod routes;
+mod router;
 mod types;
 
 use std::env;
@@ -24,7 +24,7 @@ async fn main() {
         panic!("Cannot connect to the database");
     };
 
-    let app = crate::routes::router().with_state(pool);
+    let app = crate::router::router().with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();

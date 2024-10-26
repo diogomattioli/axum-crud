@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{routes::Pool, Database};
+use crate::{router::Pool, Database};
 
 #[derive(Deserialize)]
 pub struct QueryParams {
@@ -114,7 +114,7 @@ mod tests {
         pool
     }
 
-    async fn app(pool: Pool<Any>) -> axum::Router {
+    async fn router(pool: Pool<Any>) -> axum::Router {
         Router::new()
             .route("/dummy/", get(super::list::<Dummy>))
             // .route("/dummy/:id/subdummy/", get(crud::sub_retrieve::<Dummy, SubDummy>))
@@ -125,7 +125,7 @@ mod tests {
     async fn list_ok() {
         let pool = setup_db(10).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -153,7 +153,7 @@ mod tests {
     async fn list_empty() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -176,7 +176,7 @@ mod tests {
     async fn list_paging_total() {
         let pool = setup_db(100).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -206,7 +206,7 @@ mod tests {
     async fn list_paging_size() {
         let pool = setup_db(100).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -236,7 +236,7 @@ mod tests {
     async fn list_offset_and_limit() {
         let pool = setup_db(100).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -272,7 +272,7 @@ mod tests {
     async fn list_offset() {
         let pool = setup_db(100).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -308,7 +308,7 @@ mod tests {
     async fn list_limit() {
         let pool = setup_db(100).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 

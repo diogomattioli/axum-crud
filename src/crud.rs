@@ -7,7 +7,7 @@ use axum::{
 
 use serde::Serialize;
 
-use crate::{prelude::*, routes::Pool};
+use crate::{prelude::*, router::Pool};
 
 pub async fn create<T>(uri: Uri, State(pool): State<Pool>, Json(mut new): Json<T>) -> Response
 where
@@ -206,7 +206,7 @@ mod tests {
         pool
     }
 
-    async fn app(pool: Pool<Any>) -> axum::Router {
+    async fn router(pool: Pool<Any>) -> axum::Router {
         Router::new()
             .route("/dummy/", post(crud::create::<Dummy>))
             .route("/dummy/:id", get(crud::retrieve::<Dummy>))
@@ -235,7 +235,7 @@ mod tests {
     async fn create_ok() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name"}).to_string();
 
@@ -262,7 +262,7 @@ mod tests {
     async fn create_ok_location() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name"}).to_string();
 
@@ -292,7 +292,7 @@ mod tests {
     async fn create_ok_x_item_id() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name"}).to_string();
 
@@ -322,7 +322,7 @@ mod tests {
     async fn create_empty() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -345,7 +345,7 @@ mod tests {
     async fn create_invalid() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name", "is_valid": false}).to_string();
 
@@ -368,7 +368,7 @@ mod tests {
     async fn create_bad_json() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = r#"{"id_dummy": 1, "name": "name" 123, "is_valid": false}:"#.to_string();
 
@@ -391,7 +391,7 @@ mod tests {
     async fn create_no_content_type() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name"}).to_string();
 
@@ -413,7 +413,7 @@ mod tests {
     async fn create_wrong_content_type() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name"}).to_string();
 
@@ -436,7 +436,7 @@ mod tests {
     async fn create_sub_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name", "id_sub_dummy": 2}).to_string();
 
@@ -464,7 +464,7 @@ mod tests {
     async fn create_sub_not_found() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name", "id_sub_dummy": 2}).to_string();
 
@@ -488,7 +488,7 @@ mod tests {
     async fn retrieve_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -517,7 +517,7 @@ mod tests {
     async fn retrieve_inexsistent() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -540,7 +540,7 @@ mod tests {
     async fn retrieve_bad_id() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -563,7 +563,7 @@ mod tests {
     async fn retrieve_sub_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -592,7 +592,7 @@ mod tests {
     async fn retrieve_sub_not_found() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -615,7 +615,7 @@ mod tests {
     async fn retrieve_sub_mismatch() {
         let pool = setup_db(2).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -638,7 +638,7 @@ mod tests {
     async fn update_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new"}).to_string();
 
@@ -665,7 +665,7 @@ mod tests {
     async fn update_no_content_type() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new"}).to_string();
 
@@ -687,7 +687,7 @@ mod tests {
     async fn update_wrong_content_type() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new"}).to_string();
 
@@ -710,7 +710,7 @@ mod tests {
     async fn update_empty() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -733,7 +733,7 @@ mod tests {
     async fn update_bad_id() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new"}).to_string();
 
@@ -756,7 +756,7 @@ mod tests {
     async fn update_bad_json() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = r#"{"id_dummy": 1, "name": "name" 123, "is_valid": false}:"#.to_string();
 
@@ -779,7 +779,7 @@ mod tests {
     async fn update_inexistent() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new"}).to_string();
 
@@ -802,7 +802,7 @@ mod tests {
     async fn update_invalid() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name", "is_valid": false}).to_string();
 
@@ -825,7 +825,7 @@ mod tests {
     async fn update_sub_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
 
@@ -853,7 +853,7 @@ mod tests {
     async fn update_sub_not_found() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
 
@@ -881,7 +881,7 @@ mod tests {
     async fn update_sub_mismatch() {
         let pool = setup_db(2).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = json!({"id_dummy": 1, "name": "name-new", "id_sub_dummy": 1}).to_string();
 
@@ -909,7 +909,7 @@ mod tests {
     async fn delete_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -935,7 +935,7 @@ mod tests {
     async fn delete_bad_id() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -958,7 +958,7 @@ mod tests {
     async fn delete_inexistent() {
         let pool = setup_db(0).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -981,7 +981,7 @@ mod tests {
     async fn delete_invalid() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -1007,7 +1007,7 @@ mod tests {
     async fn delete_sub_ok() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -1033,7 +1033,7 @@ mod tests {
     async fn delete_sub_not_found() {
         let pool = setup_db(1).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
@@ -1059,7 +1059,7 @@ mod tests {
     async fn delete_sub_mismatch() {
         let pool = setup_db(2).await;
 
-        let app = app(pool.clone()).await;
+        let app = router(pool.clone()).await;
 
         let body = "".to_string();
 
