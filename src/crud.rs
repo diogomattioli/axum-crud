@@ -1,53 +1,57 @@
 use axum::{
-    extract::{ Path, State },
-    http::{ StatusCode, Uri },
-    response::{ IntoResponse, Response },
+    extract::{Path, State},
+    http::{StatusCode, Uri},
+    response::{IntoResponse, Response},
     Json,
 };
 
 use serde::Serialize;
-use sqlx::{ Any, Pool };
 
-use crate::traits::{ Creator, Deleter, Retriever, Sub, Updater };
+use crate::{
+    prelude::*,
+    traits::{Creator, Deleter, Updater},
+};
 
-pub async fn create<T>(uri: Uri, State(pool): State<Pool<Any>>, Json(mut new): Json<T>) -> Response
-    where T: Creator
+pub async fn create<P, T>(uri: Uri, State(pool): State<P>, Json(mut new): Json<T>) -> Response
+where
+    T: Database<P, Item = T> + Creator,
 {
     if T::validate_create(&mut new).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
-    match T::database_create(&new, &pool).await {
-        Ok(id) => {
-            (
-                StatusCode::CREATED,
-                [
-                    ("Location", format!("{}{}", uri.path(), id)),
-                    ("X-Item-ID", format!("{}", id)),
-                ],
-            ).into_response()
-        }
+    match T::create(&new, &pool).await {
+        Ok(id) => (
+            StatusCode::CREATED,
+            [
+                ("Location", format!("{}{}", uri.path(), id)),
+                ("X-Item-ID", format!("{}", id)),
+            ],
+        )
+            .into_response(),
         Err(_) => StatusCode::NOT_ACCEPTABLE.into_response(),
     }
 }
 
-pub async fn retrieve<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> Response
-    where T: Retriever<T> + Serialize
+pub async fn retrieve<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> Response
+where
+    T: Database<P, Item = T> + Serialize,
 {
-    match T::database_retrieve(&pool, id).await {
+    match T::retrieve(&pool, id).await {
         Ok(old) => (StatusCode::OK, Json(old)).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
-pub async fn update<T>(
-    State(pool): State<Pool<Any>>,
+pub async fn update<P, T>(
+    State(pool): State<P>,
     Path(id): Path<i64>,
-    Json(mut new): Json<T>
+    Json(mut new): Json<T>,
 ) -> StatusCode
-    where T: Retriever<T> + Updater<T>
+where
+    T: Database<P, Item = T> + Updater<T>,
 {
-    let Ok(old) = T::database_retrieve(&pool, id).await else {
+    let Ok(old) = T::retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -55,16 +59,17 @@ pub async fn update<T>(
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match T::database_update(&new, &pool).await {
+    match T::update(&new, &pool).await {
         Ok(_) => StatusCode::OK,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
 }
 
-pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> StatusCode
-    where T: Retriever<T> + Deleter
+pub async fn delete<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> StatusCode
+where
+    T: Database<P, Item = T> + Deleter,
 {
-    let Ok(old) = T::database_retrieve(&pool, id).await else {
+    let Ok(old) = T::retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -72,116 +77,133 @@ pub async fn delete<T>(State(pool): State<Pool<Any>>, Path(id): Path<i64>) -> St
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
-    match T::database_delete(&pool, id).await {
+    match T::delete(&pool, id).await {
         Ok(_) => StatusCode::NO_CONTENT,
         Err(_) => StatusCode::NOT_ACCEPTABLE,
     }
 }
 
-pub async fn sub_create<T, T2>(
+pub async fn sub_create<P, T, T2>(
     uri: Uri,
-    State(pool): State<Pool<Any>>,
+    State(pool): State<P>,
     Path(id): Path<i64>,
-    Json(new): Json<T2>
-)
-    -> Response
-    where T: Retriever<T>, T2: Creator
+    Json(new): Json<T2>,
+) -> Response
+where
+    T: Database<P, Item = T>,
+    T2: Database<P, Item = T2> + Creator,
 {
-    if T::database_retrieve(&pool, id).await.is_err() {
+    if T::retrieve(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    create::<T2>(uri, State(pool), Json(new)).await
+    create::<P, T2>(uri, State(pool), Json(new)).await
 }
 
-pub async fn sub_retrieve<T, T2>(
-    State(pool): State<Pool<Any>>,
-    Path((id, sub_id)): Path<(i64, i64)>
-)
-    -> Response
-    where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Serialize
-{
-    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-
-    retrieve::<T2>(State(pool), Path(sub_id)).await
-}
-
-pub async fn sub_update<T, T2>(
-    State(pool): State<Pool<Any>>,
+pub async fn sub_retrieve<P, T, T2>(
+    State(pool): State<P>,
     Path((id, sub_id)): Path<(i64, i64)>,
-    Json(new): Json<T2>
-)
-    -> StatusCode
-    where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Updater<T2>
+) -> Response
+where
+    T: Database<P, Item = T>,
+    T2: Database<P, Item = T2> + Serialize,
 {
-    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
-        return StatusCode::NOT_FOUND;
+    if T2::parent(&pool, id, sub_id).await.is_err() {
+        return StatusCode::NOT_FOUND.into_response();
     }
 
-    update::<T2>(State(pool), Path(sub_id), Json(new)).await
+    retrieve::<P, T2>(State(pool), Path(sub_id)).await
 }
 
-pub async fn sub_delete<T, T2>(
-    State(pool): State<Pool<Any>>,
-    Path((id, sub_id)): Path<(i64, i64)>
-)
-    -> StatusCode
-    where T: Retriever<T>, T2: Sub<T> + Retriever<T2> + Deleter
+pub async fn sub_update<P, T, T2>(
+    State(pool): State<P>,
+    Path((id, sub_id)): Path<(i64, i64)>,
+    Json(new): Json<T2>,
+) -> StatusCode
+where
+    T: Database<P, Item = T>,
+    T2: Database<P, Item = T2> + Updater<T2>,
 {
-    if T2::database_match_sub(&pool, id, sub_id).await.is_err() {
+    if T2::parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
-    delete::<T2>(State(pool), Path(sub_id)).await
+    update::<P, T2>(State(pool), Path(sub_id), Json(new)).await
+}
+
+pub async fn sub_delete<P, T, T2>(
+    State(pool): State<P>,
+    Path((id, sub_id)): Path<(i64, i64)>,
+) -> StatusCode
+where
+    T: Database<P, Item = T>,
+    T2: Database<P, Item = T2> + Deleter,
+{
+    if T2::parent(&pool, id, sub_id).await.is_err() {
+        return StatusCode::NOT_FOUND;
+    }
+
+    delete::<P, T2>(State(pool), Path(sub_id)).await
 }
 
 #[cfg(test)]
 mod tests {
-    use axum::{ http::{ self, Request, StatusCode }, routing::{ delete, get, post, put }, Router };
+    use axum::{
+        http::{self, Request, StatusCode},
+        routing::{delete, get, post, put},
+        Router,
+    };
 
-    use http_body_util::BodyExt;
-    use serde_json::json;
-    use tower::ServiceExt;
-    use sqlx::{ any::AnyPoolOptions, Any, Executor, Pool };
     use crate::{
         crud,
-        traits::{ Creator, Retriever },
-        types::{ dummy::Dummy, sub_dummy::SubDummy },
+        prelude::*,
+        types::{dummy::Dummy, sub_dummy::SubDummy},
     };
+    use http_body_util::BodyExt;
+    use serde_json::json;
+    use sqlx::{any::AnyPoolOptions, Any, Executor, Pool};
+    use tower::ServiceExt;
 
     async fn setup_db(size: i64) -> Pool<Any> {
         sqlx::any::install_default_drivers();
         let pool = AnyPoolOptions::new()
             .max_connections(1) // needs to be 1, otherwise memory database is gone
-            .connect("sqlite::memory:").await
+            .connect("sqlite::memory:")
+            .await
             .unwrap();
 
-        let _ = pool.execute(
-            sqlx::raw_sql("CREATE TABLE dummy (id_dummy bigint, name text);")
-        ).await;
+        let _ = pool
+            .execute(sqlx::raw_sql(
+                "CREATE TABLE dummy (id_dummy bigint, name text);",
+            ))
+            .await;
 
-        let _ = pool.execute(
-            sqlx::raw_sql(
-                "CREATE TABLE sub_dummy (id_sub_dummy bigint, name text, id_dummy bigint);"
-            )
-        ).await;
+        let _ = pool
+            .execute(sqlx::raw_sql(
+                "CREATE TABLE sub_dummy (id_sub_dummy bigint, name text, id_dummy bigint);",
+            ))
+            .await;
 
         for i in 1..=size {
-            let _ = Dummy::database_create(
-                &(Dummy { id_dummy: i, name: format!("name-{}", i), is_valid: Some(true) }),
-                &pool
-            ).await;
-            let _ = SubDummy::database_create(
+            let _ = Dummy::create(
+                &(Dummy {
+                    id_dummy: i,
+                    name: format!("name-{}", i),
+                    is_valid: Some(true),
+                }),
+                &pool,
+            )
+            .await;
+            let _ = SubDummy::create(
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
                     name: format!("name-{}", i),
                     is_valid: Some(true),
                 }),
-                &pool
-            ).await;
+                &pool,
+            )
+            .await;
         }
 
         pool
@@ -189,15 +211,26 @@ mod tests {
 
     async fn app(pool: Pool<Any>) -> axum::Router {
         Router::new()
-            .route("/dummy/", post(crud::create::<Dummy>))
-            .route("/dummy/:id", get(crud::retrieve::<Dummy>))
-            .route("/dummy/:id", put(crud::update::<Dummy>))
-            .route("/dummy/:id", delete(crud::delete::<Dummy>))
-
-            .route("/dummy/:id/subdummy/", post(crud::sub_create::<Dummy, SubDummy>))
-            .route("/dummy/:id/subdummy/:id", get(crud::sub_retrieve::<Dummy, SubDummy>))
-            .route("/dummy/:id/subdummy/:id", put(crud::sub_update::<Dummy, SubDummy>))
-            .route("/dummy/:id/subdummy/:id", delete(crud::sub_delete::<Dummy, SubDummy>))
+            .route("/dummy/", post(crud::create::<SqlxPool, Dummy>))
+            .route("/dummy/:id", get(crud::retrieve::<SqlxPool, Dummy>))
+            .route("/dummy/:id", put(crud::update::<SqlxPool, Dummy>))
+            .route("/dummy/:id", delete(crud::delete::<SqlxPool, Dummy>))
+            .route(
+                "/dummy/:id/subdummy/",
+                post(crud::sub_create::<SqlxPool, Dummy, SubDummy>),
+            )
+            .route(
+                "/dummy/:id/subdummy/:id",
+                get(crud::sub_retrieve::<SqlxPool, Dummy, SubDummy>),
+            )
+            .route(
+                "/dummy/:id/subdummy/:id",
+                put(crud::sub_update::<SqlxPool, Dummy, SubDummy>),
+            )
+            .route(
+                "/dummy/:id/subdummy/:id",
+                delete(crud::sub_delete::<SqlxPool, Dummy, SubDummy>),
+            )
             .with_state(pool)
     }
 
@@ -216,11 +249,12 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = Dummy::database_retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -242,8 +276,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
@@ -271,8 +306,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
@@ -300,8 +336,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -322,8 +359,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -344,8 +382,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -361,8 +400,13 @@ mod tests {
 
         let response = app
             .oneshot(
-                Request::builder().method(http::Method::POST).uri("/dummy/").body(body).unwrap()
-            ).await
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/")
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
@@ -383,8 +427,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::CSV.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
@@ -405,11 +450,12 @@ mod tests {
                     .uri("/dummy/1/subdummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 2).await.unwrap();
+        let dummy = SubDummy::retrieve(&pool, 2).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -432,12 +478,13 @@ mod tests {
                     .uri("/dummy/1/subdummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert!(SubDummy::database_retrieve(&pool, 2).await.is_err());
+        assert!(SubDummy::retrieve(&pool, 2).await.is_err());
     }
 
     #[tokio::test]
@@ -455,8 +502,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -483,8 +531,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -505,8 +554,9 @@ mod tests {
                     .uri("/dummy/a")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -527,8 +577,9 @@ mod tests {
                     .uri("/dummy/1/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -555,8 +606,9 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -577,8 +629,9 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -599,11 +652,12 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = Dummy::database_retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);
@@ -620,8 +674,13 @@ mod tests {
 
         let response = app
             .oneshot(
-                Request::builder().method(http::Method::PUT).uri("/dummy/1").body(body).unwrap()
-            ).await
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/dummy/1")
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
@@ -642,8 +701,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::CSV.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
@@ -664,8 +724,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -686,8 +747,9 @@ mod tests {
                     .uri("/dummy/a")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -708,8 +770,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -730,8 +793,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -752,8 +816,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -774,11 +839,12 @@ mod tests {
                     .uri("/dummy/1/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -801,11 +867,12 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -828,11 +895,12 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -855,11 +923,12 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = Dummy::database_retrieve(&pool, 1).await;
+        let dummy = Dummy::retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -880,8 +949,9 @@ mod tests {
                     .uri("/dummy/a")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -902,8 +972,9 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -924,11 +995,12 @@ mod tests {
                     .uri("/dummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = Dummy::database_retrieve(&pool, 1).await;
+        let dummy = Dummy::retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -949,11 +1021,12 @@ mod tests {
                     .uri("/dummy/1/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await;
+        let dummy = SubDummy::retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -974,11 +1047,12 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await;
+        let dummy = SubDummy::retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());
@@ -999,11 +1073,12 @@ mod tests {
                     .uri("/dummy/2/subdummy/1")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
-        let dummy = SubDummy::database_retrieve(&pool, 1).await;
+        let dummy = SubDummy::retrieve(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());

@@ -1,8 +1,11 @@
-use axum::{ extract::{ Query, State }, http::StatusCode, response::{ IntoResponse, Response } };
-use serde::{ Deserialize, Serialize };
-use sqlx::{ Any, Pool };
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use serde::{Deserialize, Serialize};
 
-use crate::traits::Enumerator;
+use crate::Database;
 
 #[derive(Deserialize)]
 pub struct QueryParams {
@@ -13,8 +16,9 @@ pub struct QueryParams {
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 250;
 
-pub async fn list<T>(State(pool): State<Pool<Any>>, Query(query): Query<QueryParams>) -> Response
-    where T: Enumerator<T> + Serialize
+pub async fn list<P, T>(State(pool): State<P>, Query(query): Query<QueryParams>) -> Response
+where
+    T: Database<P, Item = T> + Serialize,
 {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
@@ -23,7 +27,7 @@ pub async fn list<T>(State(pool): State<Pool<Any>>, Query(query): Query<QueryPar
         StatusCode::BAD_REQUEST.into_response();
     }
 
-    let total = T::database_count(&pool).await;
+    let total = T::count(&pool).await;
     match total {
         Ok(total) if total <= 0 => {
             return StatusCode::NOT_FOUND.into_response();
@@ -34,17 +38,16 @@ pub async fn list<T>(State(pool): State<Pool<Any>>, Query(query): Query<QueryPar
         _ => {}
     }
 
-    let list = T::database_list(&pool, offset, limit).await;
+    let list = T::list(&pool, offset, limit).await;
     match list {
-        Ok(v) if v.len() > 0 => {
-            (
-                StatusCode::OK,
-                [("X-Paging-MaxLimit", format!("{}", MAX_LIMIT))],
-                [("X-Paging-Total", format!("{}", total.unwrap_or(0)))],
-                [("X-Paging-Size", format!("{}", v.len()))],
-                serde_json::to_string(&v).unwrap_or(String::new()),
-            ).into_response()
-        }
+        Ok(v) if v.len() > 0 => (
+            StatusCode::OK,
+            [("X-Paging-MaxLimit", format!("{}", MAX_LIMIT))],
+            [("X-Paging-Total", format!("{}", total.unwrap_or(0)))],
+            [("X-Paging-Size", format!("{}", v.len()))],
+            serde_json::to_string(&v).unwrap_or(String::new()),
+        )
+            .into_response(),
         Ok(_) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -52,44 +55,60 @@ pub async fn list<T>(State(pool): State<Pool<Any>>, Query(query): Query<QueryPar
 
 #[cfg(test)]
 mod tests {
-    use axum::{ http::{ self, Request, StatusCode }, routing::get, Router };
+    use axum::{
+        http::{self, Request, StatusCode},
+        routing::get,
+        Router,
+    };
 
+    use crate::{
+        types::{dummy::Dummy, sub_dummy::SubDummy},
+        Database, SqlxPool,
+    };
     use http_body_util::BodyExt;
+    use sqlx::{any::AnyPoolOptions, Any, Executor, Pool};
     use tower::ServiceExt;
-    use sqlx::{ any::AnyPoolOptions, Any, Executor, Pool };
-    use crate::{ traits::Creator, types::{ dummy::Dummy, sub_dummy::SubDummy } };
 
     async fn setup_db(size: i64) -> Pool<Any> {
         sqlx::any::install_default_drivers();
         let pool = AnyPoolOptions::new()
             .max_connections(1) // needs to be 1, otherwise memory database is gone
-            .connect("sqlite::memory:").await
+            .connect("sqlite::memory:")
+            .await
             .unwrap();
 
-        let _ = pool.execute(
-            sqlx::raw_sql("CREATE TABLE dummy (id_dummy bigint, name text);")
-        ).await;
+        let _ = pool
+            .execute(sqlx::raw_sql(
+                "CREATE TABLE dummy (id_dummy bigint, name text);",
+            ))
+            .await;
 
-        let _ = pool.execute(
-            sqlx::raw_sql(
-                "CREATE TABLE sub_dummy (id_sub_dummy bigint, name text, id_dummy bigint);"
-            )
-        ).await;
+        let _ = pool
+            .execute(sqlx::raw_sql(
+                "CREATE TABLE sub_dummy (id_sub_dummy bigint, name text, id_dummy bigint);",
+            ))
+            .await;
 
         for i in 1..=size {
-            let _ = Dummy::database_create(
-                &(Dummy { id_dummy: i, name: format!("name-{}", i), is_valid: Some(true) }),
-                &pool
-            ).await;
-            let _ = SubDummy::database_create(
+            let _ = Dummy::create(
+                &(Dummy {
+                    id_dummy: i,
+                    name: format!("name-{}", i),
+                    is_valid: Some(true),
+                }),
+                &pool,
+            )
+            .await;
+            let _ = SubDummy::create(
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
                     name: format!("name-{}", i),
                     is_valid: Some(true),
                 }),
-                &pool
-            ).await;
+                &pool,
+            )
+            .await;
         }
 
         pool
@@ -97,7 +116,7 @@ mod tests {
 
     async fn app(pool: Pool<Any>) -> axum::Router {
         Router::new()
-            .route("/dummy/", get(super::list::<Dummy>))
+            .route("/dummy/", get(super::list::<SqlxPool, Dummy>))
             // .route("/dummy/:id/subdummy/", get(crud::sub_retrieve::<Dummy, SubDummy>))
             .with_state(pool)
     }
@@ -117,8 +136,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -144,8 +164,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -166,8 +187,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -195,8 +217,9 @@ mod tests {
                     .uri("/dummy/")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -224,8 +247,9 @@ mod tests {
                     .uri("/dummy/?offset=5&limit=5")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -259,8 +283,9 @@ mod tests {
                     .uri("/dummy/?offset=5")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -294,8 +319,9 @@ mod tests {
                     .uri("/dummy/?limit=5")
                     .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                     .body(body)
-                    .unwrap()
-            ).await
+                    .unwrap(),
+            )
+            .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
