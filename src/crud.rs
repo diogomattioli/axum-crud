@@ -17,7 +17,7 @@ where
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
-    match T::create(&new, &pool).await {
+    match T::insert(&new, &pool).await {
         Ok(id) => (
             StatusCode::CREATED,
             [
@@ -34,7 +34,7 @@ pub async fn retrieve<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> Respo
 where
     T: Database<P, Item = T> + Serialize,
 {
-    match T::retrieve(&pool, id).await {
+    match T::fetch_one(&pool, id).await {
         Ok(old) => (StatusCode::OK, Json(old)).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
@@ -48,7 +48,7 @@ pub async fn update<P, T>(
 where
     T: Database<P, Item = T> + Check<Item = T>,
 {
-    let Ok(old) = T::retrieve(&pool, id).await else {
+    let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -66,7 +66,7 @@ pub async fn delete<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> StatusC
 where
     T: Database<P, Item = T> + Check,
 {
-    let Ok(old) = T::retrieve(&pool, id).await else {
+    let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
@@ -90,7 +90,7 @@ where
     T: Database<P, Item = T>,
     T2: Database<P, Item = T2> + Check,
 {
-    if T::retrieve(&pool, id).await.is_err() {
+    if T::fetch_one(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -105,7 +105,7 @@ where
     T: Database<P, Item = T>,
     T2: Database<P, Item = T2> + Serialize,
 {
-    if T2::parent(&pool, id, sub_id).await.is_err() {
+    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -121,7 +121,7 @@ where
     T: Database<P, Item = T>,
     T2: Database<P, Item = T2> + Check<Item = T2>,
 {
-    if T2::parent(&pool, id, sub_id).await.is_err() {
+    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
@@ -136,7 +136,7 @@ where
     T: Database<P, Item = T>,
     T2: Database<P, Item = T2> + Check,
 {
-    if T2::parent(&pool, id, sub_id).await.is_err() {
+    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
@@ -182,7 +182,7 @@ mod tests {
             .await;
 
         for i in 1..=size {
-            let _ = Dummy::create(
+            let _ = Dummy::insert(
                 &(Dummy {
                     id_dummy: i,
                     name: format!("name-{}", i),
@@ -191,7 +191,7 @@ mod tests {
                 &pool,
             )
             .await;
-            let _ = SubDummy::create(
+            let _ = SubDummy::insert(
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
@@ -251,7 +251,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = Dummy::retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::fetch_one(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -452,7 +452,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 2).await.unwrap();
+        let dummy = SubDummy::fetch_one(&pool, 2).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
         assert_eq!(dummy.id_dummy, 1);
@@ -481,7 +481,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert!(SubDummy::retrieve(&pool, 2).await.is_err());
+        assert!(SubDummy::fetch_one(&pool, 2).await.is_err());
     }
 
     #[tokio::test]
@@ -654,7 +654,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = Dummy::retrieve(&pool, 1).await.unwrap();
+        let dummy = Dummy::fetch_one(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_dummy, 1);
@@ -841,7 +841,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::fetch_one(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -869,7 +869,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::fetch_one(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -897,7 +897,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await.unwrap();
+        let dummy = SubDummy::fetch_one(&pool, 1).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(dummy.id_sub_dummy, 1);
@@ -925,7 +925,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = Dummy::retrieve(&pool, 1).await;
+        let dummy = Dummy::fetch_one(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -997,7 +997,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = Dummy::retrieve(&pool, 1).await;
+        let dummy = Dummy::fetch_one(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -1023,7 +1023,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await;
+        let dummy = SubDummy::fetch_one(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         assert!(dummy.is_err());
@@ -1049,7 +1049,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await;
+        let dummy = SubDummy::fetch_one(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());
@@ -1075,7 +1075,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dummy = SubDummy::retrieve(&pool, 1).await;
+        let dummy = SubDummy::fetch_one(&pool, 1).await;
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(dummy.is_ok());

@@ -38,7 +38,7 @@ where
         _ => {}
     }
 
-    let list = T::list(&pool, offset, limit).await;
+    let list = T::fetch_all(&pool, offset, limit).await;
     match list {
         Ok(v) if v.len() > 0 => (
             StatusCode::OK,
@@ -90,7 +90,7 @@ mod tests {
             .await;
 
         for i in 1..=size {
-            let _ = Dummy::create(
+            let _ = Dummy::insert(
                 &(Dummy {
                     id_dummy: i,
                     name: format!("name-{}", i),
@@ -99,7 +99,7 @@ mod tests {
                 &pool,
             )
             .await;
-            let _ = SubDummy::create(
+            let _ = SubDummy::insert(
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
