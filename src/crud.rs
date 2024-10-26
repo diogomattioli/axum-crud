@@ -7,7 +7,7 @@ use axum::{
 
 use serde::Serialize;
 
-use crate::{prelude::*, Pool};
+use crate::{prelude::*, routes::Pool};
 
 pub async fn create<T>(uri: Uri, State(pool): State<Pool>, Json(mut new): Json<T>) -> Response
 where

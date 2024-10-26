@@ -1,7 +1,5 @@
 use std::{collections::HashMap, error::Error, io::ErrorKind};
 
-pub type SqlxPool = sqlx::pool::Pool<sqlx::Any>;
-
 pub trait Database<P> {
     type Item;
     type Parent;

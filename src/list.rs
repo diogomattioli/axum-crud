@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{Database, Pool};
+use crate::{routes::Pool, Database};
 
 #[derive(Deserialize)]
 pub struct QueryParams {

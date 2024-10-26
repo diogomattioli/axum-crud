@@ -3,7 +3,7 @@ use std::{collections::HashMap, error::Error};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 
-use crate::prelude::*;
+use crate::{prelude::*, routes::SqlxPool};
 
 use super::dummy::Dummy;
 
