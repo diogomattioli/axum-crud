@@ -7,16 +7,13 @@ use axum::{
 
 use serde::Serialize;
 
-use crate::{
-    prelude::*,
-    traits::{Creator, Deleter, Updater},
-};
+use crate::prelude::*;
 
 pub async fn create<P, T>(uri: Uri, State(pool): State<P>, Json(mut new): Json<T>) -> Response
 where
-    T: Database<P, Item = T> + Creator,
+    T: Database<P, Item = T> + Check,
 {
-    if T::validate_create(&mut new).is_err() {
+    if T::check_create(&mut new).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
@@ -49,13 +46,13 @@ pub async fn update<P, T>(
     Json(mut new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<P, Item = T> + Updater<T>,
+    T: Database<P, Item = T> + Check<Item = T>,
 {
     let Ok(old) = T::retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
-    if T::validate_update(&mut new, old).is_err() {
+    if T::check_update(&mut new, old).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -67,13 +64,13 @@ where
 
 pub async fn delete<P, T>(State(pool): State<P>, Path(id): Path<i64>) -> StatusCode
 where
-    T: Database<P, Item = T> + Deleter,
+    T: Database<P, Item = T> + Check,
 {
     let Ok(old) = T::retrieve(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
-    if T::validate_delete(&old).is_err() {
+    if T::check_delete(&old).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -91,7 +88,7 @@ pub async fn sub_create<P, T, T2>(
 ) -> Response
 where
     T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Creator,
+    T2: Database<P, Item = T2> + Check,
 {
     if T::retrieve(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
@@ -122,7 +119,7 @@ pub async fn sub_update<P, T, T2>(
 ) -> StatusCode
 where
     T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Updater<T2>,
+    T2: Database<P, Item = T2> + Check<Item = T2>,
 {
     if T2::parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
@@ -137,7 +134,7 @@ pub async fn sub_delete<P, T, T2>(
 ) -> StatusCode
 where
     T: Database<P, Item = T>,
-    T2: Database<P, Item = T2> + Deleter,
+    T2: Database<P, Item = T2> + Check,
 {
     if T2::parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;

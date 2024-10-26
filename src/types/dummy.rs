@@ -1,10 +1,9 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 
 use crate::prelude::*;
-use crate::traits::{Creator, Deleter, ResultErr, Updater};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Dummy {
@@ -67,30 +66,27 @@ impl Database<SqlxPool> for Dummy {
     }
 }
 
-impl Creator for Dummy {
-    fn validate_create(&mut self) -> ResultErr<String> {
+impl Check for Dummy {
+    type Item = Self;
+
+    fn check_create(&mut self) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
-}
 
-impl Updater<Self> for Dummy {
-    fn validate_update(&mut self, old: Self) -> ResultErr<String> {
-        let _ = old;
+    fn check_update(&mut self, _old: Self::Item) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
-}
 
-impl Deleter for Dummy {
-    fn validate_delete(&self) -> ResultErr<String> {
+    fn check_delete(&self) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
 }

@@ -1,7 +1,6 @@
 mod crud;
 mod list;
 mod prelude;
-mod traits;
 mod types;
 
 use std::env;

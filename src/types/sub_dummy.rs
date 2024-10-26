@@ -1,10 +1,9 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 
 use crate::prelude::*;
-use crate::traits::{Creator, Deleter, Pool, ResultErr, Updater};
 
 use super::dummy::Dummy;
 
@@ -71,7 +70,7 @@ impl Database<SqlxPool> for SubDummy {
             .await
     }
 
-    async fn parent(pool: &Pool, id: i64, sub_id: i64) -> Result<Self::Parent, impl Error> {
+    async fn parent(pool: &SqlxPool, id: i64, sub_id: i64) -> Result<Self::Parent, impl Error> {
         sqlx::query_as(
             "SELECT * FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
         )
@@ -81,30 +80,27 @@ impl Database<SqlxPool> for SubDummy {
     }
 }
 
-impl Creator for SubDummy {
-    fn validate_create(&mut self) -> ResultErr<String> {
+impl Check for SubDummy {
+    type Item = Self;
+
+    fn check_create(&mut self) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
-}
 
-impl Updater<Self> for SubDummy {
-    fn validate_update(&mut self, old: Self) -> ResultErr<String> {
-        let _ = old;
+    fn check_update(&mut self, _old: Self::Item) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
-}
 
-impl Deleter for SubDummy {
-    fn validate_delete(&self) -> ResultErr<String> {
+    fn check_delete(&self) -> Result<(), HashMap<String, String>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err("".to_string()),
+            _ => Err(HashMap::new()),
         }
     }
 }
