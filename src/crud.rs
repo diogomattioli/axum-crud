@@ -11,7 +11,7 @@ use crate::{prelude::*, Pool};
 
 pub async fn create<T>(uri: Uri, State(pool): State<Pool>, Json(mut new): Json<T>) -> Response
 where
-    T: Database<Pool, Item = T> + Check,
+    T: Database<Pool> + Check,
 {
     if T::check_create(&mut new).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
@@ -88,7 +88,7 @@ pub async fn sub_create<T, T2>(
 ) -> Response
 where
     T: Database<Pool, Item = T>,
-    T2: Database<Pool, Item = T2> + Check,
+    T2: Database<Pool> + Check,
 {
     if T::fetch_one(&pool, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
