@@ -9,7 +9,11 @@ pub trait Database<P> {
     async fn delete(pool: &P, id: i64) -> Result<(), impl Error>;
     async fn fetch_one(pool: &P, id: i64) -> Result<Self::Item, impl Error>;
     async fn fetch_all(pool: &P, offset: i64, limit: i64) -> Result<Vec<Self::Item>, impl Error>;
-    async fn fetch_parent(_pool: &P, _id: i64, _sub_id: i64) -> Result<Self::Parent, impl Error> {
+    async fn fetch_parent(
+        _pool: &P,
+        _parent_id: i64,
+        _id: i64,
+    ) -> Result<Self::Parent, impl Error> {
         Err(std::io::Error::new(ErrorKind::Other, ""))
     }
     async fn count(pool: &P) -> Result<i64, impl Error>;

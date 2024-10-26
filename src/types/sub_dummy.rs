@@ -69,14 +69,14 @@ impl Database<SqlxPool> for SubDummy {
 
     async fn fetch_parent(
         pool: &SqlxPool,
+        parent_id: i64,
         id: i64,
-        sub_id: i64,
     ) -> Result<Self::Parent, impl Error> {
         sqlx::query_as(
             "SELECT * FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
         )
+        .bind(parent_id)
         .bind(id)
-        .bind(sub_id)
         .fetch_one(pool).await
     }
 
