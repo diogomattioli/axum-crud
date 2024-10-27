@@ -1,26 +1,23 @@
-use std::{error::Error, io::ErrorKind};
+use std::error::Error;
 
 use validator::Validate;
 
-pub trait Database<P>
+pub trait Database<DB>
 where
     Self: Sized,
 {
+    async fn insert(&self, pool: &DB) -> Result<i64, impl Error>;
+    async fn update(&self, pool: &DB) -> Result<(), impl Error>;
+    async fn delete(pool: &DB, id: i64) -> Result<(), impl Error>;
+    async fn fetch_one(pool: &DB, id: i64) -> Result<Self, impl Error>;
+    async fn fetch_all(pool: &DB, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error>;
+    async fn count(pool: &DB) -> Result<i64, impl Error>;
+}
+
+pub trait MatchParent<DB> {
     type Parent;
 
-    async fn insert(&self, pool: &P) -> Result<i64, impl Error>;
-    async fn update(&self, pool: &P) -> Result<(), impl Error>;
-    async fn delete(pool: &P, id: i64) -> Result<(), impl Error>;
-    async fn fetch_one(pool: &P, id: i64) -> Result<Self, impl Error>;
-    async fn fetch_all(pool: &P, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error>;
-    async fn fetch_parent(
-        _pool: &P,
-        _parent_id: i64,
-        _id: i64,
-    ) -> Result<Self::Parent, impl Error> {
-        Err(std::io::Error::new(ErrorKind::Other, ""))
-    }
-    async fn count(pool: &P) -> Result<i64, impl Error>;
+    async fn fetch_parent(pool: &DB, parent_id: i64, id: i64) -> Result<Self::Parent, impl Error>;
 }
 
 pub trait Check: Validate

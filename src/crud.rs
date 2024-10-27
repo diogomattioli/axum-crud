@@ -87,7 +87,7 @@ pub async fn sub_create<T>(
     Json(new): Json<T>,
 ) -> Response
 where
-    T: Database<Pool> + Check,
+    T: Database<Pool> + MatchParent<Pool> + Check,
     T::Parent: Database<Pool>,
 {
     if T::Parent::fetch_one(&pool, parent_id).await.is_err() {
@@ -102,7 +102,7 @@ pub async fn sub_retrieve<T>(
     Path((parent_id, id)): Path<(i64, i64)>,
 ) -> Response
 where
-    T: Database<Pool> + Serialize,
+    T: Database<Pool> + MatchParent<Pool> + Serialize,
 {
     if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
@@ -117,7 +117,7 @@ pub async fn sub_update<T>(
     Json(new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool> + Check,
+    T: Database<Pool> + MatchParent<Pool> + Check,
 {
     if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;
@@ -131,7 +131,7 @@ pub async fn sub_delete<T>(
     Path((parent_id, id)): Path<(i64, i64)>,
 ) -> StatusCode
 where
-    T: Database<Pool> + Check,
+    T: Database<Pool> + MatchParent<Pool> + Check,
 {
     if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;

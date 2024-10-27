@@ -15,8 +15,6 @@ pub struct Dummy {
 }
 
 impl Database<SqlxPool> for Dummy {
-    type Parent = Self;
-
     async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
         sqlx::query("INSERT INTO dummy VALUES ($1, $2) RETURNING id_dummy")
             .bind(self.id_dummy)

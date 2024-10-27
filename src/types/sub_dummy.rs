@@ -18,8 +18,6 @@ pub struct SubDummy {
 }
 
 impl Database<SqlxPool> for SubDummy {
-    type Parent = Dummy;
-
     async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
         sqlx::query("INSERT INTO sub_dummy VALUES ($1, $2, $3) RETURNING id_sub_dummy")
             .bind(self.id_sub_dummy)
@@ -63,6 +61,17 @@ impl Database<SqlxPool> for SubDummy {
             .await
     }
 
+    async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
+        sqlx::query("SELECT count(id_sub_dummy) FROM sub_dummy")
+            .fetch_one(pool)
+            .await?
+            .try_get(0)
+    }
+}
+
+impl MatchParent<SqlxPool> for SubDummy {
+    type Parent = Dummy;
+
     async fn fetch_parent(
         pool: &SqlxPool,
         parent_id: i64,
@@ -74,13 +83,6 @@ impl Database<SqlxPool> for SubDummy {
         .bind(parent_id)
         .bind(id)
         .fetch_one(pool).await
-    }
-
-    async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
-        sqlx::query("SELECT count(id_sub_dummy) FROM sub_dummy")
-            .fetch_one(pool)
-            .await?
-            .try_get(0)
     }
 }
 
