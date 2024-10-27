@@ -2,15 +2,17 @@ use std::{error::Error, io::ErrorKind};
 
 use validator::Validate;
 
-pub trait Database<P> {
-    type Item;
+pub trait Database<P>
+where
+    Self: Sized,
+{
     type Parent;
 
     async fn insert(&self, pool: &P) -> Result<i64, impl Error>;
     async fn update(&self, pool: &P) -> Result<(), impl Error>;
     async fn delete(pool: &P, id: i64) -> Result<(), impl Error>;
-    async fn fetch_one(pool: &P, id: i64) -> Result<Self::Item, impl Error>;
-    async fn fetch_all(pool: &P, offset: i64, limit: i64) -> Result<Vec<Self::Item>, impl Error>;
+    async fn fetch_one(pool: &P, id: i64) -> Result<Self, impl Error>;
+    async fn fetch_all(pool: &P, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error>;
     async fn fetch_parent(
         _pool: &P,
         _parent_id: i64,

@@ -18,7 +18,6 @@ pub struct SubDummy {
 }
 
 impl Database<SqlxPool> for SubDummy {
-    type Item = Self;
     type Parent = Dummy;
 
     async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
@@ -49,18 +48,14 @@ impl Database<SqlxPool> for SubDummy {
             .map(|_| ())
     }
 
-    async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self::Item, impl Error> {
+    async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self, impl Error> {
         sqlx::query_as("SELECT * FROM sub_dummy WHERE id_sub_dummy = $1")
             .bind(id)
             .fetch_one(pool)
             .await
     }
 
-    async fn fetch_all(
-        pool: &SqlxPool,
-        offset: i64,
-        limit: i64,
-    ) -> Result<Vec<Self::Item>, impl Error> {
+    async fn fetch_all(pool: &SqlxPool, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error> {
         sqlx::query_as("SELECT * FROM sub_dummy limit $1, $2")
             .bind(offset)
             .bind(limit)

@@ -32,7 +32,7 @@ where
 
 pub async fn retrieve<T>(State(pool): State<Pool>, Path(id): Path<i64>) -> Response
 where
-    T: Database<Pool, Item = T> + Serialize,
+    T: Database<Pool> + Serialize,
 {
     match T::fetch_one(&pool, id).await {
         Ok(old) => (StatusCode::OK, Json(old)).into_response(),
@@ -46,7 +46,7 @@ pub async fn update<T>(
     Json(mut new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool, Item = T> + Check,
+    T: Database<Pool> + Check,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
@@ -64,7 +64,7 @@ where
 
 pub async fn delete<T>(State(pool): State<Pool>, Path(id): Path<i64>) -> StatusCode
 where
-    T: Database<Pool, Item = T> + Check,
+    T: Database<Pool> + Check,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
@@ -87,7 +87,7 @@ pub async fn sub_create<T, T2>(
     Json(new): Json<T2>,
 ) -> Response
 where
-    T: Database<Pool, Item = T>,
+    T: Database<Pool>,
     T2: Database<Pool> + Check,
 {
     if T::fetch_one(&pool, id).await.is_err() {
@@ -102,8 +102,8 @@ pub async fn sub_retrieve<T, T2>(
     Path((id, sub_id)): Path<(i64, i64)>,
 ) -> Response
 where
-    T: Database<Pool, Item = T>,
-    T2: Database<Pool, Item = T2> + Serialize,
+    T: Database<Pool>,
+    T2: Database<Pool> + Serialize,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
@@ -118,8 +118,8 @@ pub async fn sub_update<T, T2>(
     Json(new): Json<T2>,
 ) -> StatusCode
 where
-    T: Database<Pool, Item = T>,
-    T2: Database<Pool, Item = T2> + Check,
+    T: Database<Pool>,
+    T2: Database<Pool> + Check,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;
@@ -133,8 +133,8 @@ pub async fn sub_delete<T, T2>(
     Path((id, sub_id)): Path<(i64, i64)>,
 ) -> StatusCode
 where
-    T: Database<Pool, Item = T>,
-    T2: Database<Pool, Item = T2> + Check,
+    T: Database<Pool>,
+    T2: Database<Pool> + Check,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;

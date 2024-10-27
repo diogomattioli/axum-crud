@@ -18,7 +18,7 @@ const MAX_LIMIT: i64 = 250;
 
 pub async fn list<T>(State(pool): State<Pool>, Query(query): Query<QueryParams>) -> Response
 where
-    T: Database<Pool, Item = T> + Serialize,
+    T: Database<Pool> + Serialize,
 {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
