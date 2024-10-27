@@ -1,11 +1,11 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{router::Pool, Database};
+use crate::{router::Pool, Database, MatchParent};
 
 #[derive(Deserialize)]
 pub struct QueryParams {
@@ -51,6 +51,22 @@ where
         Ok(_) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
+}
+
+pub async fn sub_list<T>(
+    State(pool): State<Pool>,
+    Path(parent_id): Path<i64>,
+    Query(query): Query<QueryParams>,
+) -> Response
+where
+    T: Database<Pool> + MatchParent<Pool> + Serialize,
+    T::Parent: Database<Pool>,
+{
+    if T::Parent::fetch_one(&pool, parent_id).await.is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    list::<T>(State(pool), Query(query)).await
 }
 
 #[cfg(test)]
