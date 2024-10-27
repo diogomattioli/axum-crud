@@ -1,13 +1,14 @@
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
+use validator::Validate;
 
 use crate::{prelude::*, router::SqlxPool};
 
 use super::dummy::Dummy;
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, Validate, FromRow)]
 pub struct SubDummy {
     pub id_sub_dummy: i64,
     pub id_dummy: i64,
@@ -89,26 +90,24 @@ impl Database<SqlxPool> for SubDummy {
 }
 
 impl Check for SubDummy {
-    type Item = Self;
-
-    fn check_create(&mut self) -> Result<(), HashMap<String, String>> {
+    fn check_create(&mut self) -> Result<(), Vec<&str>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err(HashMap::new()),
+            _ => Err(vec![]),
         }
     }
 
-    fn check_update(&mut self, _old: Self::Item) -> Result<(), HashMap<String, String>> {
+    fn check_update(&mut self, _old: Self) -> Result<(), Vec<&str>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err(HashMap::new()),
+            _ => Err(vec![]),
         }
     }
 
-    fn check_delete(&self) -> Result<(), HashMap<String, String>> {
+    fn check_delete(&self) -> Result<(), Vec<&str>> {
         match self.is_valid {
             Some(true) | None => Ok(()),
-            _ => Err(HashMap::new()),
+            _ => Err(vec![]),
         }
     }
 }

@@ -46,7 +46,7 @@ pub async fn update<T>(
     Json(mut new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool, Item = T> + Check<Item = T>,
+    T: Database<Pool, Item = T> + Check,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
@@ -119,7 +119,7 @@ pub async fn sub_update<T, T2>(
 ) -> StatusCode
 where
     T: Database<Pool, Item = T>,
-    T2: Database<Pool, Item = T2> + Check<Item = T2>,
+    T2: Database<Pool, Item = T2> + Check,
 {
     if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
         return StatusCode::NOT_FOUND;

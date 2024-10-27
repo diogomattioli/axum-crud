@@ -1,4 +1,6 @@
-use std::{collections::HashMap, error::Error, io::ErrorKind};
+use std::{error::Error, io::ErrorKind};
+
+use validator::Validate;
 
 pub trait Database<P> {
     type Item;
@@ -19,19 +21,26 @@ pub trait Database<P> {
     async fn count(pool: &P) -> Result<i64, impl Error>;
 }
 
-pub trait Check {
-    type Item;
-
-    fn check_create(&mut self) -> Result<(), HashMap<String, String>> {
+pub trait Check: Validate
+where
+    Self: Sized,
+{
+    fn check_create(&mut self) -> Result<(), Vec<&str>> {
+        self.check_validate()?;
         Ok(())
     }
 
-    fn check_update(&mut self, old: Self::Item) -> Result<(), HashMap<String, String>> {
-        let _ = old;
+    fn check_update(&mut self, _old: Self) -> Result<(), Vec<&str>> {
+        self.check_validate()?;
         Ok(())
     }
 
-    fn check_delete(&self) -> Result<(), HashMap<String, String>> {
+    fn check_delete(&self) -> Result<(), Vec<&str>> {
         Ok(())
+    }
+
+    fn check_validate(&self) -> Result<(), Vec<&str>> {
+        self.validate()
+            .map_err(|err| err.into_errors().into_keys().collect::<Vec<_>>())
     }
 }
