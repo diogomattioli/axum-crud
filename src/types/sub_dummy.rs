@@ -69,7 +69,7 @@ impl Database<SqlxPool> for SubDummy {
         id: i64,
     ) -> Result<Self::Parent, impl Error> {
         sqlx::query_as(
-            "SELECT * FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
+            "SELECT b.* FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
         )
         .bind(parent_id)
         .bind(id)

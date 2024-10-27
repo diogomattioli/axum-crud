@@ -80,67 +80,64 @@ where
     }
 }
 
-pub async fn sub_create<T, T2>(
+pub async fn sub_create<T>(
     uri: Uri,
     State(pool): State<Pool>,
-    Path(id): Path<i64>,
-    Json(new): Json<T2>,
+    Path(parent_id): Path<i64>,
+    Json(new): Json<T>,
 ) -> Response
 where
-    T: Database<Pool>,
-    T2: Database<Pool> + Check,
+    T: Database<Pool> + Check,
+    T::Parent: Database<Pool>,
 {
-    if T::fetch_one(&pool, id).await.is_err() {
+    if T::Parent::fetch_one(&pool, parent_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    create::<T2>(uri, State(pool), Json(new)).await
+    create(uri, State(pool), Json(new)).await
 }
 
-pub async fn sub_retrieve<T, T2>(
+pub async fn sub_retrieve<T>(
     State(pool): State<Pool>,
-    Path((id, sub_id)): Path<(i64, i64)>,
+    Path((parent_id, id)): Path<(i64, i64)>,
 ) -> Response
 where
-    T: Database<Pool>,
-    T2: Database<Pool> + Serialize,
+    T: Database<Pool> + Serialize,
 {
-    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
+    if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    retrieve::<T2>(State(pool), Path(sub_id)).await
+    retrieve::<T>(State(pool), Path(id)).await
 }
 
-pub async fn sub_update<T, T2>(
+pub async fn sub_update<T>(
     State(pool): State<Pool>,
-    Path((id, sub_id)): Path<(i64, i64)>,
-    Json(new): Json<T2>,
+    Path((parent_id, id)): Path<(i64, i64)>,
+    Json(new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool>,
-    T2: Database<Pool> + Check,
+    T: Database<Pool> + Check,
 {
-    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
+    if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
-    update::<T2>(State(pool), Path(sub_id), Json(new)).await
+    update(State(pool), Path(id), Json(new)).await
 }
 
-pub async fn sub_delete<T, T2>(
+pub async fn sub_delete<T>(
     State(pool): State<Pool>,
-    Path((id, sub_id)): Path<(i64, i64)>,
+    Path((parent_id, id)): Path<(i64, i64)>,
 ) -> StatusCode
 where
-    T: Database<Pool>,
-    T2: Database<Pool> + Check,
+    T: Database<Pool> + Check,
 {
-    if T2::fetch_parent(&pool, id, sub_id).await.is_err() {
+    if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;
     }
 
-    delete::<T2>(State(pool), Path(sub_id)).await
+    delete::<T>(State(pool), Path(id)).await
 }
 
 #[cfg(test)]
@@ -212,21 +209,15 @@ mod tests {
             .route("/dummy/:id", get(crud::retrieve::<Dummy>))
             .route("/dummy/:id", put(crud::update::<Dummy>))
             .route("/dummy/:id", delete(crud::delete::<Dummy>))
-            .route(
-                "/dummy/:id/subdummy/",
-                post(crud::sub_create::<Dummy, SubDummy>),
-            )
+            .route("/dummy/:id/subdummy/", post(crud::sub_create::<SubDummy>))
             .route(
                 "/dummy/:id/subdummy/:id",
-                get(crud::sub_retrieve::<Dummy, SubDummy>),
+                get(crud::sub_retrieve::<SubDummy>),
             )
+            .route("/dummy/:id/subdummy/:id", put(crud::sub_update::<SubDummy>))
             .route(
                 "/dummy/:id/subdummy/:id",
-                put(crud::sub_update::<Dummy, SubDummy>),
-            )
-            .route(
-                "/dummy/:id/subdummy/:id",
-                delete(crud::sub_delete::<Dummy, SubDummy>),
+                delete(crud::sub_delete::<SubDummy>),
             )
             .with_state(pool)
     }
