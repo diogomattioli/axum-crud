@@ -6,14 +6,15 @@ use axum::{
 };
 
 use serde::Serialize;
+use validator::Validate;
 
 use crate::{prelude::*, router::Pool};
 
 pub async fn create<T>(uri: Uri, State(pool): State<Pool>, Json(mut new): Json<T>) -> Response
 where
-    T: Database<Pool> + Check,
+    T: Database<Pool> + Validate + Check,
 {
-    if T::check_create(&mut new).is_err() {
+    if new.validate().is_err() || new.check_create().is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY.into_response();
     }
 
@@ -46,13 +47,13 @@ pub async fn update<T>(
     Json(mut new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool> + Check,
+    T: Database<Pool> + Validate + Check,
 {
     let Ok(old) = T::fetch_one(&pool, id).await else {
         return StatusCode::NOT_FOUND;
     };
 
-    if T::check_update(&mut new, old).is_err() {
+    if new.validate().is_err() || new.check_update(old).is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -70,7 +71,7 @@ where
         return StatusCode::NOT_FOUND;
     };
 
-    if T::check_delete(&old).is_err() {
+    if old.check_delete().is_err() {
         return StatusCode::UNPROCESSABLE_ENTITY;
     }
 
@@ -87,7 +88,7 @@ pub async fn sub_create<T>(
     Json(new): Json<T>,
 ) -> Response
 where
-    T: Database<Pool> + MatchParent<Pool> + Check,
+    T: Database<Pool> + MatchParent<Pool> + Validate + Check,
     T::Parent: Database<Pool>,
 {
     if T::Parent::fetch_one(&pool, parent_id).await.is_err() {
@@ -117,7 +118,7 @@ pub async fn sub_update<T>(
     Json(new): Json<T>,
 ) -> StatusCode
 where
-    T: Database<Pool> + MatchParent<Pool> + Check,
+    T: Database<Pool> + MatchParent<Pool> + Validate + Check,
 {
     if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;

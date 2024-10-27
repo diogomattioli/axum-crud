@@ -1,7 +1,5 @@
 use std::error::Error;
 
-use validator::Validate;
-
 pub trait Database<DB>
 where
     Self: Sized,
@@ -20,26 +18,19 @@ pub trait MatchParent<DB> {
     async fn fetch_parent(pool: &DB, parent_id: i64, id: i64) -> Result<Self::Parent, impl Error>;
 }
 
-pub trait Check: Validate
+pub trait Check
 where
     Self: Sized,
 {
     fn check_create(&mut self) -> Result<(), Vec<&str>> {
-        self.check_validate()?;
         Ok(())
     }
 
     fn check_update(&mut self, _old: Self) -> Result<(), Vec<&str>> {
-        self.check_validate()?;
         Ok(())
     }
 
     fn check_delete(&self) -> Result<(), Vec<&str>> {
         Ok(())
-    }
-
-    fn check_validate(&self) -> Result<(), Vec<&str>> {
-        self.validate()
-            .map_err(|err| err.into_errors().into_keys().collect::<Vec<_>>())
     }
 }
