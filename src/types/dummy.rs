@@ -63,6 +63,8 @@ impl DatabaseFetchAll<Pool> for Dummy {
     const FIELDS_TEXT: &'static [&'static str] = &["name"];
     const FIELDS_NUMERIC: &'static [&'static str] = &["id_dummy"];
 
+    const FIELDS_ORDER: &'static [&'static str] = &["id_dummy", "name"];
+
     async fn fetch_all(
         pool: &Pool,
         search: Option<String>,
