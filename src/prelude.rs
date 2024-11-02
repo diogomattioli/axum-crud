@@ -40,7 +40,7 @@ where
         let iter = tokens
             .clone()
             .take_while(|_| !Self::FIELDS_TEXT.is_empty())
-            .map(|token| QueryToken::Text(token.trim().to_string()));
+            .map(|token| QueryToken::Text(format!("%{}%", token.trim().to_string())));
 
         let iter = tokens
             .clone()
@@ -65,7 +65,7 @@ where
                     .flat_map(|token| {
                         Self::get_field_array(token).iter().map(move |field| {
                             if let QueryToken::Text(_) = token {
-                                format!("{field} LIKE '%?%'")
+                                format!("{field} LIKE ?")
                             } else {
                                 format!("{field} = ?")
                             }
@@ -166,9 +166,9 @@ mod tests {
         assert_eq!(tokens.next(), Some(QueryToken::Float(1.0)));
         assert_eq!(tokens.next(), Some(QueryToken::Float(1.23)));
         assert_eq!(tokens.next(), Some(QueryToken::Numeric(1)));
-        assert_eq!(tokens.next(), Some(QueryToken::Text("name".to_string())));
-        assert_eq!(tokens.next(), Some(QueryToken::Text("1".to_string())));
-        assert_eq!(tokens.next(), Some(QueryToken::Text("1.23".to_string())));
+        assert_eq!(tokens.next(), Some(QueryToken::Text("%name%".to_string())));
+        assert_eq!(tokens.next(), Some(QueryToken::Text("%1%".to_string())));
+        assert_eq!(tokens.next(), Some(QueryToken::Text("%1.23%".to_string())));
         assert_eq!(tokens.next(), None);
     }
 
@@ -178,6 +178,6 @@ mod tests {
 
         let sql = QueryStruct::create_query_where(&tokens);
 
-        assert_eq!(sql, Some("WHERE lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%'".to_string()))
+        assert_eq!(sql, Some("WHERE lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ?".to_string()))
     }
 }
