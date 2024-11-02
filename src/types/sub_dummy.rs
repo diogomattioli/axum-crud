@@ -53,14 +53,6 @@ impl Database<SqlxPool> for SubDummy {
             .await
     }
 
-    async fn fetch_all(pool: &SqlxPool, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error> {
-        sqlx::query_as("SELECT * FROM sub_dummy limit $1, $2")
-            .bind(offset)
-            .bind(limit)
-            .fetch_all(pool)
-            .await
-    }
-
     async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
         sqlx::query("SELECT count(id_sub_dummy) FROM sub_dummy")
             .fetch_one(pool)

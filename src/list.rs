@@ -5,10 +5,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{router::Pool, Database, MatchParent};
+use crate::{router::Pool, Database, DatabaseFetchAll, MatchParent};
 
 #[derive(Deserialize)]
 pub struct QueryParams {
+    search: Option<String>,
+    order: Option<String>,
     offset: Option<i64>,
     limit: Option<i64>,
 }
@@ -18,7 +20,7 @@ const MAX_LIMIT: i64 = 250;
 
 pub async fn list<T>(State(pool): State<Pool>, Query(query): Query<QueryParams>) -> Response
 where
-    T: Database<Pool> + Serialize,
+    T: Database<Pool> + DatabaseFetchAll<Pool> + Serialize,
 {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
@@ -38,7 +40,7 @@ where
         _ => {}
     }
 
-    let list = T::fetch_all(&pool, offset, limit).await;
+    let list = T::fetch_all(&pool, query.search, query.order, offset, limit).await;
     match list {
         Ok(v) if v.len() > 0 => (
             StatusCode::OK,
@@ -59,7 +61,7 @@ pub async fn sub_list<T>(
     Query(query): Query<QueryParams>,
 ) -> Response
 where
-    T: Database<Pool> + MatchParent<Pool> + Serialize,
+    T: Database<Pool> + DatabaseFetchAll<Pool> + MatchParent<Pool> + Serialize,
     T::Parent: Database<Pool>,
 {
     if T::Parent::fetch_one(&pool, parent_id).await.is_err() {

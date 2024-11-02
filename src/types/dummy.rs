@@ -51,14 +51,6 @@ impl Database<SqlxPool> for Dummy {
             .await
     }
 
-    async fn fetch_all(pool: &SqlxPool, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error> {
-        sqlx::query_as("SELECT * FROM dummy limit $1, $2")
-            .bind(offset)
-            .bind(limit)
-            .fetch_all(pool)
-            .await
-    }
-
     async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
         sqlx::query("SELECT count(id_dummy) FROM dummy")
             .fetch_one(pool)
@@ -67,27 +59,25 @@ impl Database<SqlxPool> for Dummy {
     }
 }
 
-impl DatabaseSearch<Pool> for Dummy {
+impl DatabaseFetchAll<Pool> for Dummy {
     const FIELDS_TEXT: &'static [&'static str] = &["name"];
     const FIELDS_NUMERIC: &'static [&'static str] = &["id_dummy"];
-}
 
-impl DatabaseWhere<Pool> for Dummy {
-    async fn fetch_where(
+    async fn fetch_all(
         pool: &Pool,
+        search: Option<String>,
+        order: Option<String>,
         offset: i64,
         limit: i64,
-        query: String,
     ) -> Result<Vec<Self>, impl Error> {
-        let tokens = Self::tokens(query);
+        let tokens = Self::tokens(search.unwrap_or_default());
 
-        let sql = format!(
-            "SELECT * FROM dummy {} limit ?, ?",
-            Self::create_where(&tokens)
-        );
+        let sql_where = Self::create_query_where(&tokens).unwrap_or_default();
+        let sql_order = Self::create_query_order(order.unwrap_or_default()).unwrap_or_default();
+        let sql = format!("SELECT * FROM dummy {} {} limit ?, ?", sql_where, sql_order);
 
         let mut query = sqlx::query_as(&sql);
-        query = Self::fill_where(tokens, query, |query, token| match token {
+        query = Self::fill_query_where(tokens, query, |query, token| match token {
             QueryToken::Text(value) => query.bind(value),
             QueryToken::Numeric(value) => query.bind(value),
             QueryToken::Float(value) => query.bind(value),

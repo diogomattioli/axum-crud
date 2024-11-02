@@ -8,20 +8,7 @@ where
     async fn update(&self, pool: &DB) -> Result<(), impl Error>;
     async fn delete(pool: &DB, id: i64) -> Result<(), impl Error>;
     async fn fetch_one(pool: &DB, id: i64) -> Result<Self, impl Error>;
-    async fn fetch_all(pool: &DB, offset: i64, limit: i64) -> Result<Vec<Self>, impl Error>;
     async fn count(pool: &DB) -> Result<i64, impl Error>;
-}
-
-pub trait DatabaseWhere<DB>
-where
-    Self: DatabaseSearch<DB>,
-{
-    async fn fetch_where(
-        pool: &DB,
-        offset: i64,
-        limit: i64,
-        query: String,
-    ) -> Result<Vec<Self>, impl Error>;
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -31,7 +18,7 @@ pub enum QueryToken {
     Float(f64),
 }
 
-pub trait DatabaseSearch<DB>
+pub trait DatabaseFetchAll<DB>
 where
     Self: Sized,
 {
@@ -69,26 +56,30 @@ where
         iter.collect::<Vec<_>>()
     }
 
-    fn create_where(tokens: &Vec<QueryToken>) -> String {
-        format!(
-            "WHERE {}",
-            tokens
-                .iter()
-                .flat_map(|token| {
-                    Self::get_field_array(token).iter().map(move |field| {
-                        if let QueryToken::Text(_) = token {
-                            format!("{field} LIKE '%?%'")
-                        } else {
-                            format!("{field} = ?")
-                        }
+    fn create_query_where(tokens: &Vec<QueryToken>) -> Option<String> {
+        if !tokens.is_empty() {
+            Some(format!(
+                "WHERE {}",
+                tokens
+                    .iter()
+                    .flat_map(|token| {
+                        Self::get_field_array(token).iter().map(move |field| {
+                            if let QueryToken::Text(_) = token {
+                                format!("{field} LIKE '%?%'")
+                            } else {
+                                format!("{field} = ?")
+                            }
+                        })
                     })
-                })
-                .collect::<Vec<_>>()
-                .join(" OR ")
-        )
+                    .collect::<Vec<_>>()
+                    .join(" OR ")
+            ))
+        } else {
+            None
+        }
     }
 
-    fn fill_where<Q, F>(tokens: Vec<QueryToken>, mut query: Q, mut f: F) -> Q
+    fn fill_query_where<Q, F>(tokens: Vec<QueryToken>, mut query: Q, mut f: F) -> Q
     where
         F: FnMut(Q, QueryToken) -> Q,
     {
@@ -100,6 +91,24 @@ where
 
         query
     }
+
+    const FIELDS_ORDER: &'static [&'static str] = &[];
+
+    fn create_query_order(order: String) -> Option<String> {
+        if Self::FIELDS_ORDER.contains(&order.as_str()) {
+            Some(format!("ORDER BY {order}"))
+        } else {
+            None
+        }
+    }
+
+    async fn fetch_all(
+        pool: &DB,
+        search: Option<String>,
+        order: Option<String>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, impl Error>;
 }
 
 pub trait MatchParent<DB> {
@@ -127,15 +136,27 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use crate::router::Pool;
 
     use super::*;
 
     struct QueryStruct;
-    impl DatabaseSearch<Pool> for QueryStruct {
+    impl DatabaseFetchAll<Pool> for QueryStruct {
         const FIELDS_TEXT: &'static [&'static str] = &["title", "name"];
         const FIELDS_NUMERIC: &'static [&'static str] = &["id", "size"];
         const FIELDS_FLOAT: &'static [&'static str] = &["lat", "lon"];
+
+        async fn fetch_all(
+            _pool: &Pool,
+            _search: Option<String>,
+            _order: Option<String>,
+            _offset: i64,
+            _limit: i64,
+        ) -> Result<Vec<Self>, impl Error> {
+            Ok::<Vec<Self>, std::io::Error>(vec![])
+        }
     }
 
     #[test]
@@ -155,8 +176,8 @@ mod tests {
     fn query_create_where() {
         let tokens = QueryStruct::tokens("name 1 1.23".to_string());
 
-        let sql = QueryStruct::create_where(&tokens);
+        let sql = QueryStruct::create_query_where(&tokens);
 
-        assert_eq!(sql, "WHERE lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%'")
+        assert_eq!(sql, Some("WHERE lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%' OR title LIKE '%?%' OR name LIKE '%?%'".to_string()))
     }
 }
