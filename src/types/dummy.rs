@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 use validator::Validate;
 
-use crate::{prelude::*, router::SqlxPool};
+use crate::{
+    prelude::*,
+    router::{Pool, SqlxPool},
+};
 
 #[derive(Debug, Serialize, Deserialize, Validate, FromRow)]
 pub struct Dummy {
@@ -61,6 +64,35 @@ impl Database<SqlxPool> for Dummy {
             .fetch_one(pool)
             .await?
             .try_get(0)
+    }
+}
+
+impl DatabaseSearch<Pool> for Dummy {
+    const FIELDS_TEXT: &'static [&'static str] = &["name"];
+    const FIELDS_NUMERIC: &'static [&'static str] = &["id_dummy"];
+}
+
+impl DatabaseWhere<Pool> for Dummy {
+    async fn fetch_where(
+        pool: &Pool,
+        offset: i64,
+        limit: i64,
+        query: String,
+    ) -> Result<Vec<Self>, impl Error> {
+        let tokens = Self::tokens(query);
+
+        let sql = format!(
+            "SELECT * FROM dummy {} limit ?, ?",
+            Self::create_where(&tokens)
+        );
+
+        let mut query = sqlx::query_as(&sql);
+        query = Self::fill_where(tokens, query, |query, token| match token {
+            QueryToken::Text(value) => query.bind(value),
+            QueryToken::Numeric(value) => query.bind(value),
+            QueryToken::Float(value) => query.bind(value),
+        });
+        query.bind(offset).bind(limit).fetch_all(pool).await
     }
 }
 
