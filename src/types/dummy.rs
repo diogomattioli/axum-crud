@@ -77,11 +77,13 @@ impl DatabaseFetchAll<Pool> for Dummy {
         let sql = format!("SELECT * FROM dummy {} {} limit ?, ?", sql_where, sql_order);
 
         let mut query = sqlx::query_as(&sql);
-        query = Self::fill_query_where(tokens, query, |query, token| match token {
-            QueryToken::Text(value) => query.bind(value),
-            QueryToken::Numeric(value) => query.bind(value),
-            QueryToken::Float(value) => query.bind(value),
-        });
+        if !tokens.is_empty() {
+            query = Self::fill_query_where(tokens, query, |query, token| match token {
+                QueryToken::Text(value) => query.bind(value),
+                QueryToken::Numeric(value) => query.bind(value),
+                QueryToken::Float(value) => query.bind(value),
+            });
+        }
         query.bind(offset).bind(limit).fetch_all(pool).await
     }
 }

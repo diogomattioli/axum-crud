@@ -357,4 +357,40 @@ mod tests {
             [1, 2, 3, 4, 5]
         )
     }
+
+    #[tokio::test]
+    async fn list_search() {
+        let pool = database(10).await;
+
+        let app = router(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/?search=-9")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let dummies: Vec<Dummy> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(dummies.len(), 1);
+
+        assert_eq!(
+            dummies
+                .into_iter()
+                .map(|r| r.id_dummy)
+                .collect::<Vec<i64>>(),
+            [9]
+        )
+    }
 }
