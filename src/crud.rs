@@ -85,7 +85,7 @@ pub async fn sub_create<T>(
     uri: Uri,
     State(pool): State<Pool>,
     Path(parent_id): Path<i64>,
-    Json(new): Json<T>,
+    Json(mut new): Json<T>,
 ) -> Response
 where
     T: Database<Pool> + MatchParent<Pool> + Validate + Check,
@@ -93,6 +93,10 @@ where
 {
     if T::Parent::fetch_one(&pool, parent_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
+    }
+
+    if new.get_parent_id() != parent_id {
+        return StatusCode::BAD_REQUEST.into_response();
     }
 
     create(uri, State(pool), Json(new)).await
@@ -115,13 +119,17 @@ where
 pub async fn sub_update<T>(
     State(pool): State<Pool>,
     Path((parent_id, id)): Path<(i64, i64)>,
-    Json(new): Json<T>,
+    Json(mut new): Json<T>,
 ) -> StatusCode
 where
     T: Database<Pool> + MatchParent<Pool> + Validate + Check,
 {
     if T::fetch_parent(&pool, parent_id, id).await.is_err() {
         return StatusCode::NOT_FOUND;
+    }
+
+    if new.get_parent_id() != parent_id {
+        return StatusCode::BAD_REQUEST;
     }
 
     update(State(pool), Path(id), Json(new)).await
@@ -474,6 +482,29 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert!(SubDummy::fetch_one(&pool, 2).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn create_sub_mismatch() {
+        let pool = database(1).await;
+
+        let app = router(pool.clone()).await;
+
+        let body = json!({"id_dummy": 2, "name": "name", "id_sub_dummy": 2}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/dummy/1/subdummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -867,6 +898,29 @@ mod tests {
         assert_eq!(dummy.id_sub_dummy, 1);
         assert_eq!(dummy.id_dummy, 1);
         assert_eq!(dummy.name, "name-1");
+    }
+
+    #[tokio::test]
+    async fn update_sub_mismatch_data() {
+        let pool = database(2).await;
+
+        let app = router(pool.clone()).await;
+
+        let body = json!({"id_dummy": 2, "name": "name-new", "id_sub_dummy": 1}).to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::PUT)
+                    .uri("/dummy/1/subdummy/1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

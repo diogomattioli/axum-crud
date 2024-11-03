@@ -115,6 +115,8 @@ pub trait MatchParent<DB> {
     type Parent;
 
     async fn fetch_parent(pool: &DB, parent_id: i64, id: i64) -> Result<Self::Parent, impl Error>;
+
+    fn get_parent_id(&mut self) -> i64;
 }
 
 pub trait Check

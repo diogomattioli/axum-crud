@@ -61,6 +61,40 @@ impl Database<Pool> for SubDummy {
     }
 }
 
+impl DatabaseFetchAll<Pool> for SubDummy {
+    const FIELDS_TEXT: &'static [&'static str] = &["name"];
+    const FIELDS_NUMERIC: &'static [&'static str] = &["id_sub_dummy"];
+
+    const FIELDS_ORDER: &'static [&'static str] = &["id_sub_dummy", "name"];
+
+    async fn fetch_all(
+        pool: &Pool,
+        search: Option<String>,
+        order: Option<String>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, impl Error> {
+        let tokens = Self::tokens(search.unwrap_or_default());
+
+        let sql_where = Self::create_query_where(&tokens).unwrap_or_default();
+        let sql_order = Self::create_query_order(order.unwrap_or_default()).unwrap_or_default();
+        let sql = format!(
+            "SELECT * FROM sub_dummy {} {} limit ?, ?",
+            sql_where, sql_order
+        );
+
+        let mut query = sqlx::query_as(&sql);
+        if !tokens.is_empty() {
+            query = Self::fill_query_where(tokens, query, |query, token| match token {
+                QueryToken::Text(value) => query.bind(value),
+                QueryToken::Numeric(value) => query.bind(value),
+                QueryToken::Float(value) => query.bind(value),
+            });
+        }
+        query.bind(offset).bind(limit).fetch_all(pool).await
+    }
+}
+
 impl MatchParent<Pool> for SubDummy {
     type Parent = Dummy;
 
@@ -75,6 +109,10 @@ impl MatchParent<Pool> for SubDummy {
         .bind(parent_id)
         .bind(id)
         .fetch_one(pool).await
+    }
+
+    fn get_parent_id(&mut self) -> i64 {
+        self.id_dummy
     }
 }
 
