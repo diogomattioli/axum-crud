@@ -19,7 +19,7 @@ pub struct Dummy {
 
 impl Database<SqlxPool> for Dummy {
     async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
-        sqlx::query("INSERT INTO dummy VALUES ($1, $2) RETURNING id_dummy")
+        sqlx::query("INSERT INTO dummy VALUES (?, ?) RETURNING id_dummy")
             .bind(self.id_dummy)
             .bind(self.name.clone())
             .fetch_one(pool)
@@ -28,16 +28,16 @@ impl Database<SqlxPool> for Dummy {
     }
 
     async fn update(&self, pool: &SqlxPool) -> Result<(), impl Error> {
-        sqlx::query("UPDATE dummy SET name = $2 WHERE id_dummy = $1")
-            .bind(self.id_dummy)
+        sqlx::query("UPDATE dummy SET name = ? WHERE id_dummy = ?")
             .bind(self.name.clone())
+            .bind(self.id_dummy)
             .execute(pool)
             .await
             .map(|_| ())
     }
 
     async fn delete(pool: &SqlxPool, id: i64) -> Result<(), impl Error> {
-        sqlx::query("DELETE FROM dummy WHERE id_dummy = $1")
+        sqlx::query("DELETE FROM dummy WHERE id_dummy = ?")
             .bind(id)
             .execute(pool)
             .await
@@ -45,7 +45,7 @@ impl Database<SqlxPool> for Dummy {
     }
 
     async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self, impl Error> {
-        sqlx::query_as("SELECT * FROM dummy WHERE id_dummy = $1")
+        sqlx::query_as("SELECT * FROM dummy WHERE id_dummy = ?")
             .bind(id)
             .fetch_one(pool)
             .await

@@ -19,7 +19,7 @@ pub struct SubDummy {
 
 impl Database<SqlxPool> for SubDummy {
     async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
-        sqlx::query("INSERT INTO sub_dummy VALUES ($1, $2, $3) RETURNING id_sub_dummy")
+        sqlx::query("INSERT INTO sub_dummy VALUES (?, ?, ?) RETURNING id_sub_dummy")
             .bind(self.id_sub_dummy)
             .bind(self.name.clone())
             .bind(self.id_dummy)
@@ -29,17 +29,17 @@ impl Database<SqlxPool> for SubDummy {
     }
 
     async fn update(&self, pool: &SqlxPool) -> Result<(), impl Error> {
-        sqlx::query("UPDATE sub_dummy SET name = $2, id_dummy = $3 WHERE id_sub_dummy = $1")
-            .bind(self.id_sub_dummy)
+        sqlx::query("UPDATE sub_dummy SET name = ?, id_dummy = ? WHERE id_sub_dummy = ?")
             .bind(self.name.clone())
             .bind(self.id_dummy)
+            .bind(self.id_sub_dummy)
             .execute(pool)
             .await
             .map(|_| ())
     }
 
     async fn delete(pool: &SqlxPool, id: i64) -> Result<(), impl Error> {
-        sqlx::query("DELETE FROM sub_dummy WHERE id_sub_dummy = $1")
+        sqlx::query("DELETE FROM sub_dummy WHERE id_sub_dummy = ?")
             .bind(id)
             .execute(pool)
             .await
@@ -47,7 +47,7 @@ impl Database<SqlxPool> for SubDummy {
     }
 
     async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self, impl Error> {
-        sqlx::query_as("SELECT * FROM sub_dummy WHERE id_sub_dummy = $1")
+        sqlx::query_as("SELECT * FROM sub_dummy WHERE id_sub_dummy = ?")
             .bind(id)
             .fetch_one(pool)
             .await
@@ -70,7 +70,7 @@ impl MatchParent<SqlxPool> for SubDummy {
         id: i64,
     ) -> Result<Self::Parent, impl Error> {
         sqlx::query_as(
-            "SELECT b.* FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = $1 AND a.id_sub_dummy = $2"
+            "SELECT b.* FROM sub_dummy a INNER JOIN dummy b ON a.id_dummy = b.id_dummy WHERE a.id_dummy = ? AND a.id_sub_dummy = ?"
         )
         .bind(parent_id)
         .bind(id)
