@@ -4,10 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 use validator::Validate;
 
-use crate::{
-    prelude::*,
-    router::{Pool, SqlxPool},
-};
+use crate::{prelude::*, router::Pool};
 
 #[derive(Debug, Serialize, Deserialize, Validate, FromRow)]
 pub struct Dummy {
@@ -17,8 +14,8 @@ pub struct Dummy {
     pub is_valid: Option<bool>,
 }
 
-impl Database<SqlxPool> for Dummy {
-    async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
+impl Database<Pool> for Dummy {
+    async fn insert(&self, pool: &Pool) -> Result<i64, impl Error> {
         sqlx::query("INSERT INTO dummy VALUES (?, ?) RETURNING id_dummy")
             .bind(self.id_dummy)
             .bind(self.name.clone())
@@ -27,7 +24,7 @@ impl Database<SqlxPool> for Dummy {
             .try_get(0)
     }
 
-    async fn update(&self, pool: &SqlxPool) -> Result<(), impl Error> {
+    async fn update(&self, pool: &Pool) -> Result<(), impl Error> {
         sqlx::query("UPDATE dummy SET name = ? WHERE id_dummy = ?")
             .bind(self.name.clone())
             .bind(self.id_dummy)
@@ -36,7 +33,7 @@ impl Database<SqlxPool> for Dummy {
             .map(|_| ())
     }
 
-    async fn delete(pool: &SqlxPool, id: i64) -> Result<(), impl Error> {
+    async fn delete(pool: &Pool, id: i64) -> Result<(), impl Error> {
         sqlx::query("DELETE FROM dummy WHERE id_dummy = ?")
             .bind(id)
             .execute(pool)
@@ -44,14 +41,14 @@ impl Database<SqlxPool> for Dummy {
             .map(|_| ())
     }
 
-    async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self, impl Error> {
+    async fn fetch_one(pool: &Pool, id: i64) -> Result<Self, impl Error> {
         sqlx::query_as("SELECT * FROM dummy WHERE id_dummy = ?")
             .bind(id)
             .fetch_one(pool)
             .await
     }
 
-    async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
+    async fn count(pool: &Pool) -> Result<i64, impl Error> {
         sqlx::query("SELECT count(id_dummy) FROM dummy")
             .fetch_one(pool)
             .await?

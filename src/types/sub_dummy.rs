@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Row};
 use validator::Validate;
 
-use crate::{prelude::*, router::SqlxPool};
+use crate::{prelude::*, router::Pool};
 
 use super::dummy::Dummy;
 
@@ -17,8 +17,8 @@ pub struct SubDummy {
     pub is_valid: Option<bool>,
 }
 
-impl Database<SqlxPool> for SubDummy {
-    async fn insert(&self, pool: &SqlxPool) -> Result<i64, impl Error> {
+impl Database<Pool> for SubDummy {
+    async fn insert(&self, pool: &Pool) -> Result<i64, impl Error> {
         sqlx::query("INSERT INTO sub_dummy VALUES (?, ?, ?) RETURNING id_sub_dummy")
             .bind(self.id_sub_dummy)
             .bind(self.name.clone())
@@ -28,7 +28,7 @@ impl Database<SqlxPool> for SubDummy {
             .try_get(0)
     }
 
-    async fn update(&self, pool: &SqlxPool) -> Result<(), impl Error> {
+    async fn update(&self, pool: &Pool) -> Result<(), impl Error> {
         sqlx::query("UPDATE sub_dummy SET name = ?, id_dummy = ? WHERE id_sub_dummy = ?")
             .bind(self.name.clone())
             .bind(self.id_dummy)
@@ -38,7 +38,7 @@ impl Database<SqlxPool> for SubDummy {
             .map(|_| ())
     }
 
-    async fn delete(pool: &SqlxPool, id: i64) -> Result<(), impl Error> {
+    async fn delete(pool: &Pool, id: i64) -> Result<(), impl Error> {
         sqlx::query("DELETE FROM sub_dummy WHERE id_sub_dummy = ?")
             .bind(id)
             .execute(pool)
@@ -46,14 +46,14 @@ impl Database<SqlxPool> for SubDummy {
             .map(|_| ())
     }
 
-    async fn fetch_one(pool: &SqlxPool, id: i64) -> Result<Self, impl Error> {
+    async fn fetch_one(pool: &Pool, id: i64) -> Result<Self, impl Error> {
         sqlx::query_as("SELECT * FROM sub_dummy WHERE id_sub_dummy = ?")
             .bind(id)
             .fetch_one(pool)
             .await
     }
 
-    async fn count(pool: &SqlxPool) -> Result<i64, impl Error> {
+    async fn count(pool: &Pool) -> Result<i64, impl Error> {
         sqlx::query("SELECT count(id_sub_dummy) FROM sub_dummy")
             .fetch_one(pool)
             .await?
@@ -61,11 +61,11 @@ impl Database<SqlxPool> for SubDummy {
     }
 }
 
-impl MatchParent<SqlxPool> for SubDummy {
+impl MatchParent<Pool> for SubDummy {
     type Parent = Dummy;
 
     async fn fetch_parent(
-        pool: &SqlxPool,
+        pool: &Pool,
         parent_id: i64,
         id: i64,
     ) -> Result<Self::Parent, impl Error> {
