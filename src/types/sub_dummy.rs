@@ -62,6 +62,8 @@ impl Database<Pool> for SubDummy {
 }
 
 impl DatabaseFetchAll<Pool> for SubDummy {
+    const FIELD_PARENT: &'static str = "id_dummy";
+
     const FIELDS_TEXT: &'static [&'static str] = &["name"];
     const FIELDS_NUMERIC: &'static [&'static str] = &["id_sub_dummy"];
 
@@ -71,6 +73,7 @@ impl DatabaseFetchAll<Pool> for SubDummy {
         pool: &Pool,
         search: Option<String>,
         order: Option<String>,
+        parent_id: Option<i64>,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<Self>, impl Error> {
@@ -84,6 +87,7 @@ impl DatabaseFetchAll<Pool> for SubDummy {
         );
 
         let mut query = sqlx::query_as(&sql);
+        query = query.bind(parent_id.unwrap_or_default());
         if !tokens.is_empty() {
             query = Self::fill_query_where(tokens, query, |query, token| match token {
                 QueryToken::Text(value) => query.bind(value),

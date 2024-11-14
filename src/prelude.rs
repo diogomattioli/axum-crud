@@ -22,6 +22,8 @@ pub trait DatabaseFetchAll<DB>
 where
     Self: Sized,
 {
+    const FIELD_PARENT: &'static str = "";
+
     const FIELDS_TEXT: &'static [&'static str] = &[];
     const FIELDS_NUMERIC: &'static [&'static str] = &[];
     const FIELDS_FLOAT: &'static [&'static str] = &[];
@@ -57,9 +59,15 @@ where
     }
 
     fn create_query_where(tokens: &Vec<QueryToken>) -> Option<String> {
+        let mut pieces = vec![];
+
+        if !Self::FIELD_PARENT.is_empty() {
+            pieces.push(format!("{} = ?", Self::FIELD_PARENT));
+        }
+
         if !tokens.is_empty() {
-            Some(format!(
-                "WHERE {}",
+            pieces.push(format!(
+                "({})",
                 tokens
                     .iter()
                     .flat_map(|token| {
@@ -73,7 +81,11 @@ where
                     })
                     .collect::<Vec<_>>()
                     .join(" OR ")
-            ))
+            ));
+        }
+
+        if !pieces.is_empty() {
+            Some(format!("WHERE {}", pieces.join(" AND ")))
         } else {
             None
         }
@@ -106,6 +118,7 @@ where
         pool: &DB,
         search: Option<String>,
         order: Option<String>,
+        parent_id: Option<i64>,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<Self>, impl Error>;
@@ -154,6 +167,7 @@ mod tests {
             _pool: &Pool,
             _search: Option<String>,
             _order: Option<String>,
+            _parent_id: Option<i64>,
             _offset: i64,
             _limit: i64,
         ) -> Result<Vec<Self>, impl Error> {
@@ -180,6 +194,6 @@ mod tests {
 
         let sql = QueryStruct::create_query_where(&tokens);
 
-        assert_eq!(sql, Some("WHERE lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ?".to_string()))
+        assert_eq!(sql, Some("WHERE (lat = ? OR lon = ? OR lat = ? OR lon = ? OR id = ? OR size = ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ? OR title LIKE ? OR name LIKE ?)".to_string()))
     }
 }

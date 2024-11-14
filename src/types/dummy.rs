@@ -66,6 +66,7 @@ impl DatabaseFetchAll<Pool> for Dummy {
         pool: &Pool,
         search: Option<String>,
         order: Option<String>,
+        _parent_id: Option<i64>,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<Self>, impl Error> {

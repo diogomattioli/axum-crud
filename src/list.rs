@@ -18,7 +18,11 @@ pub struct QueryParams {
 const DEFAULT_LIMIT: i64 = 50;
 const MAX_LIMIT: i64 = 250;
 
-pub async fn list<T>(State(pool): State<Pool>, Query(query): Query<QueryParams>) -> Response
+pub async fn list<T>(
+    State(pool): State<Pool>,
+    parent_id: Option<Path<i64>>,
+    Query(query): Query<QueryParams>,
+) -> Response
 where
     T: Database<Pool> + DatabaseFetchAll<Pool> + Serialize,
 {
@@ -40,7 +44,15 @@ where
         _ => {}
     }
 
-    let list = T::fetch_all(&pool, query.search, query.order, offset, limit).await;
+    let list = T::fetch_all(
+        &pool,
+        query.search,
+        query.order,
+        parent_id.map(|Path(v)| v),
+        offset,
+        limit,
+    )
+    .await;
     match list {
         Ok(v) if v.len() > 0 => (
             StatusCode::OK,
@@ -68,7 +80,7 @@ where
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    list::<T>(State(pool), Query(query)).await
+    list::<T>(State(pool), Some(Path(parent_id)), Query(query)).await
 }
 
 #[cfg(test)]
@@ -121,7 +133,7 @@ mod tests {
                 &(SubDummy {
                     id_sub_dummy: i,
                     id_dummy: i,
-                    name: format!("name-{}", i),
+                    name: format!("sub-name-{}", i),
                     is_valid: Some(true),
                 }),
                 &pool,
@@ -135,7 +147,7 @@ mod tests {
     async fn router(pool: Pool<Any>) -> axum::Router {
         Router::new()
             .route("/dummy/", get(super::list::<Dummy>))
-            // .route("/dummy/:id/subdummy/", get(crud::sub_retrieve::<Dummy, SubDummy>))
+            .route("/dummy/:id/sub_dummy/", get(super::sub_list::<SubDummy>))
             .with_state(pool)
     }
 
@@ -427,6 +439,70 @@ mod tests {
                 .map(|r| r.id_dummy)
                 .collect::<Vec<i64>>(),
             [1, 10, 2, 3, 4, 5, 6, 7, 8, 9]
+        )
+    }
+
+    #[tokio::test]
+    async fn list_sub_ok() {
+        let pool = database(10).await;
+
+        let app = router(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/1/sub_dummy/")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let dummies: Vec<Dummy> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(dummies.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_sub_search() {
+        let pool = database(10).await;
+
+        let app = router(pool.clone()).await;
+
+        let body = "".to_string();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(http::Method::GET)
+                    .uri("/dummy/1/sub_dummy/?search=sub-name-1")
+                    .header(http::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let dummies: Vec<SubDummy> = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(dummies.len(), 1);
+
+        assert_eq!(
+            dummies
+                .into_iter()
+                .map(|r| (r.id_dummy, r.id_sub_dummy))
+                .collect::<Vec<_>>(),
+            [(1, 1)]
         )
     }
 }
